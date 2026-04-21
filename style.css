@@ -1,0 +1,622 @@
+body {
+    margin: 0;
+    overflow: hidden; /* No scrollbars */
+    background: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#right-edge-detector {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 20px;
+    height: 100vh;
+    background: transparent;
+    z-index: 9998;
+}
+
+#controls {
+    position: absolute;
+    top: 10px;
+    right: -300px;
+    z-index: 9999;
+    display: flex;
+    gap: 10px;
+    transition: right 0.3s ease;
+}
+#controls.show,
+#controls.pinned {
+    right: 10px;
+}
+
+#music-status {
+    position: absolute;
+    top: 10px;
+    right: 120px; /* Cạnh nút thoát */
+    z-index: 9999;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 50%;
+    width: 38px;
+    height: 38px;
+    display: none; /* Ẩn mặc định */
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    animation: musicPulse 1.5s infinite ease-in-out;
+}
+@keyframes musicPulse {
+    0%, 100% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.1); opacity: 1; }
+}
+
+button {
+    padding: 8px 12px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    border: 1px solid white;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    backdrop-filter: blur(4px);
+}
+button:hover { background: rgba(50,50,50,0.9); }
+
+/* ===== HOAT ANH BE SUI ===== */
+@keyframes suiWobble {
+    0%   { transform: rotate(0deg)   scale(1,    1);    }
+    18%  { transform: rotate(-6deg)  scale(1.06, 0.94); }
+    36%  { transform: rotate(6deg)   scale(0.94, 1.06); }
+    54%  { transform: rotate(-4deg)  scale(1.04, 0.97); }
+    72%  { transform: rotate(4deg)   scale(0.97, 1.03); }
+    88%  { transform: rotate(-1deg)  scale(1.01, 0.99); }
+    100% { transform: rotate(0deg)   scale(1,    1);    }
+}
+@keyframes suiSquish {
+    0%   { transform: scaleX(1)    scaleY(1);    }
+    25%  { transform: scaleX(1.25) scaleY(0.75); }
+    55%  { transform: scaleX(0.9)  scaleY(1.1);  }
+    100% { transform: scaleX(1)    scaleY(1);    }
+}
+.sui-wobble { animation: suiWobble 0.65s ease-in-out; }
+.sui-squish { animation: suiSquish 0.22s ease-out;    }
+
+@keyframes gentleBob {
+    0%, 100% { transform: scaleY(1); }
+    50%      { transform: scaleY(0.96); } /* Nhún nhẹ */
+}
+
+#slime:hover { 
+    animation: gentleBob 0.6s ease-in-out infinite;
+    transform-origin: bottom center;
+}
+
+.flipped { scale: -1 1; }
+
+/* ===== LAND SQUISH ===== */
+@keyframes landSquish {
+    0%   { transform: scale(1.15, 0.85); } /* Co dẹt */
+    40%  { transform: scale(0.95, 1.05); } /* Bật lại hơi cao */
+    70%  { transform: scale(1.02, 0.98); } /* Rung nhẹ */
+    100% { transform: scale(1,    1);    } /* Trở về bình thường */
+}
+.land-squish { 
+    animation: landSquish 0.4s ease-out;
+    transform-origin: bottom center; /* Co dãn từ chân */
+}
+
+/* ===== EMOTE POPUPS ===== */
+@keyframes emoteFadeUp {
+    0%   { transform: translateY(0) scale(0); opacity: 0; }
+    20%  { transform: translateY(-20px) scale(1.2); opacity: 1; }
+    80%  { transform: translateY(-30px) scale(1); opacity: 1; }
+    100% { transform: translateY(-40px) scale(0.8); opacity: 0; }
+}
+.emote-popup {
+    position: fixed;
+    pointer-events: none;
+    z-index: 10001;
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 0 10px rgba(0,0,0,0.5);
+    animation: emoteFadeUp 1s ease-out forwards;
+}
+
+/* ===== HEART PARTICLES ===== */
+@keyframes heartFloat {
+    0%   { transform: translateY(0)      translateX(0)                   scale(0.5); opacity: 1;   }
+    40%  { transform: translateY(-45px)  translateX(calc(var(--drift) * 0.6)) scale(1.15); opacity: 0.95; }
+    100% { transform: translateY(-100px) translateX(var(--drift))         scale(0.7); opacity: 0;   }
+}
+.heart-particle {
+    position: fixed;
+    pointer-events: none;
+    z-index: 10000;
+    user-select: none;
+    line-height: 1;
+    animation: heartFloat linear forwards;
+    will-change: transform, opacity;
+}
+
+#slime {
+    position: absolute;
+    width: 150px;
+    height: auto;
+    cursor: grab;
+    z-index: 1000;
+}
+#slime:active {
+    cursor: grabbing;
+}
+
+/* ===== DRAW MODE INDICATOR ===== */
+#drawIndicator {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-70px);
+    background: rgba(15, 15, 25, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    padding: 10px 20px;
+    color: rgba(255,255,255,0.85);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    z-index: 9999;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    opacity: 0;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+                opacity 0.2s ease,
+                border-color 0.2s ease,
+                box-shadow 0.2s ease;
+}
+#drawIndicator.ready {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    border-color: rgba(52, 211, 153, 0.55);
+    box-shadow: 0 0 22px rgba(52, 211, 153, 0.28), 0 4px 20px rgba(0,0,0,0.4);
+}
+#drawIndicator.drawing {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    border-color: rgba(99, 179, 255, 0.65);
+    box-shadow: 0 0 28px rgba(99, 179, 255, 0.4), 0 4px 20px rgba(0,0,0,0.4);
+    animation: drawPulse 0.9s ease-in-out infinite alternate;
+}
+@keyframes drawPulse {
+    from { box-shadow: 0 0 16px rgba(99, 179, 255, 0.3), 0 4px 20px rgba(0,0,0,0.4); }
+    to   { box-shadow: 0 0 36px rgba(99, 179, 255, 0.6), 0 4px 20px rgba(0,0,0,0.4); }
+}
+#drawIndicatorIcon { font-size: 16px; }
+
+
+.platform {
+    position: absolute;
+    border: 2px dashed rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.1); 
+    z-index: 500;
+}
+.platform.hidden {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* Khung vẽ tạm */
+#draw-box {
+    position: absolute;
+    border: 2px solid cyan;
+    background: rgba(0, 255, 255, 0.2);
+    z-index: 800;
+    pointer-events: none;
+}
+
+/* ===== HIEU UNG TIA NANG (GOD RAYS) ===== */
+#sunbeam-container {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    pointer-events: none;
+    /* Mặc định ẩn tuyệt đối */
+    display: none;
+    opacity: 0;
+    z-index: 1;
+}
+
+#sunbeam-container.show {
+    display: block !important;
+    animation: fadeInWeather 2s forwards;
+}
+
+@keyframes fadeInWeather {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+#sunbeams {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    
+    background: 
+        /* Quầng sáng trung tâm cố định */
+        radial-gradient(circle at 0% 0%, rgba(255, 255, 180, 0.6) 0%, rgba(255, 255, 200, 0.3) 15%, transparent 40%);
+    
+    filter: blur(4px);
+    mix-blend-mode: screen;
+    -webkit-mask-image: radial-gradient(circle at 0% 0%, black 0%, rgba(0,0,0,0.5) 25%, transparent 60%);
+}
+
+#sunbeams::before,
+#sunbeams::after,
+#sunbeams {
+    /* Lớp lót để tạo hiệu ứng tia nắng biến mất/hiện ra */
+}
+
+/* Base layer - Lớp tia nắng 1 */
+#sunbeams {
+    background-image: 
+        radial-gradient(circle at 0% 0%, rgba(255, 255, 180, 0.6) 0%, rgba(255, 255, 200, 0.3) 15%, transparent 40%),
+        repeating-conic-gradient(
+            from 0deg at 0% 0%,
+            transparent 0 11.5deg,
+            rgba(255, 255, 210, 0.4) 12.5deg,
+            rgba(255, 255, 255, 0.6) 13deg,
+            rgba(255, 255, 210, 0.4) 13.5deg,
+            transparent 14.5deg 21.7deg
+        );
+    animation: sunFlickerLayer1 4.3s infinite ease-in-out;
+}
+
+#sunbeams::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: repeating-conic-gradient(
+        from 43deg at 0% 0%,
+        transparent 0 16.3deg,
+        rgba(255, 255, 255, 0.3) 17.5deg,
+        rgba(255, 255, 210, 0.5) 18.5deg,
+        rgba(255, 255, 255, 0.3) 19.5deg,
+        transparent 20.7deg 31.1deg
+    );
+    filter: blur(8px);
+    animation: sunFlickerLayer2 3.1s infinite ease-in-out;
+}
+
+#sunbeams::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: repeating-conic-gradient(
+        from 117deg at 0% 0%,
+        transparent 0 9.1deg,
+        rgba(255, 255, 255, 0.2) 10.1deg,
+        rgba(255, 255, 220, 0.45) 11.1deg,
+        rgba(255, 255, 255, 0.2) 12.1deg,
+        transparent 13.1deg 17.3deg
+    );
+    filter: blur(3px);
+    animation: sunFlickerLayer3 2.5s infinite ease-in-out;
+}
+
+@keyframes sunFlickerLayer1 {
+    0%, 100% { opacity: 0.3; }
+    50%      { opacity: 0.7; }
+}
+
+@keyframes sunFlickerLayer2 {
+    0%, 100% { opacity: 0.25; }
+    40%      { opacity: 0.65; }
+}
+
+@keyframes sunFlickerLayer3 {
+    0%, 100% { opacity: 0.35; }
+    60%      { opacity: 0.75; }
+}
+
+/* ===== HIEU UNG MAY TROI (DRIFTING CLOUDS) ===== */
+#clouds {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    pointer-events: none;
+    /* Mặc định ẩn tuyệt đối */
+    display: none;
+    opacity: 0;
+    z-index: 0; /* Nằm dưới tia nắng (z=1) */
+}
+
+#clouds.show {
+    display: block !important;
+    animation: fadeInWeather 2s forwards;
+}
+
+.cloud {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+    filter: blur(60px); /* Độ nhòe cực lớn để mây mờ ảo */
+    pointer-events: none;
+}
+
+.cloud-1 {
+    width: 600px; height: 200px;
+    top: -50px; left: -650px;
+    animation: cloudDrift 60s linear infinite;
+    opacity: 0.5;
+}
+
+.cloud-2 {
+    width: 400px; height: 150px;
+    top: 30px; left: -450px;
+    animation: cloudDrift 90s linear infinite 10s;
+    opacity: 0.3;
+}
+
+.cloud-3 {
+    width: 800px; height: 250px;
+    top: -80px; left: -850px;
+    animation: cloudDrift 120s linear infinite 25s;
+    opacity: 0.4;
+}
+
+.cloud-4 {
+    width: 350px; height: 120px;
+    top: 70px; left: -400px;
+    animation: cloudDrift 75s linear infinite 45s;
+    opacity: 0.25;
+}
+
+@keyframes cloudDrift {
+    from { transform: translateX(0); }
+    to   { transform: translateX(calc(100vw + 1000px)); }
+}
+
+/* ===== HIEU UNG BAO (STORM SYSTEM) ===== */
+#storm-container {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    pointer-events: none;
+    z-index: 10002; /* Rất cao để trên tất cả */
+}
+
+#dark-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    transition: opacity 5s ease;
+    z-index: 1;
+}
+
+#lightning-layer {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: white;
+    opacity: 0;
+    z-index: 2; /* Sau mây */
+}
+
+/* Tia sét cục bộ */
+#lightning-layer::after {
+    content: '';
+    position: absolute;
+    top: 0; left: var(--lightning-x, 50%);
+    width: 150px;
+    height: 100%;
+    background: radial-gradient(ellipse at top, rgba(255,255,255,1) 0%, rgba(200,220,255,0.4) 30%, transparent 70%);
+    filter: blur(20px);
+    transform: translateX(-50%);
+}
+
+#storm-clouds {
+    position: absolute;
+    top: -50px;
+    width: 100%;
+    height: 350px;
+    opacity: 0;
+    transition: opacity 5s ease;
+    z-index: 3;
+}
+
+.storm-cloud {
+    position: absolute;
+    background: radial-gradient(circle, rgba(100, 100, 110, 0.95) 0%, rgba(40, 40, 50, 0.8) 70%, transparent 100%);
+    filter: blur(45px);
+    border-radius: 50%;
+    animation: stormCloudDrift 10s ease-in-out infinite alternate;
+}
+
+@keyframes stormCloudDrift {
+    0%, 100% { transform: translateX(0) translateY(0); }
+    50%      { transform: translateX(30px) translateY(10px); }
+}
+
+.cloud-top-1 { width: 900px; height: 180px; top: -30px; left: -150px; }
+.cloud-top-2 { width: 1000px; height: 250px; top: -60px; right: -200px; }
+.cloud-top-3 { width: 1100px; height: 200px; top: -20px; left: 15%; background: radial-gradient(circle, rgba(130, 130, 140, 0.85) 0%, rgba(60, 60, 70, 0.7) 80%, transparent 100%); }
+
+@keyframes flash {
+    0%, 100% { opacity: 0; }
+    5%, 15%  { opacity: 0.9; }
+    10%      { opacity: 0.3; }
+    30%, 50% { opacity: 0.7; }
+    40%      { opacity: 0.2; }
+}
+
+.lightning-active {
+    animation: flash var(--lightning-duration, 1.2s) ease-out;
+}
+
+#rain-layer {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 4;
+}
+
+.raindrop {
+    position: absolute;
+    background: rgba(200, 220, 255, 0.6);
+    width: 1px;
+    height: 20px;
+    pointer-events: none;
+    transform: rotate(35deg); /* Tăng độ xiên để khớp với dấu / hơn */
+}
+
+@keyframes rainFall {
+    /* Trượt sang trái -600px để tạo độ xiên mạnh */
+    to { transform: translate(-600px, 110vh) rotate(35deg); }
+}
+
+.storm-active #dark-overlay,
+.storm-active #storm-clouds {
+    opacity: 1;
+}
+
+/* ===== HIEU UNG CAU VONG (RAINBOW) ===== */
+#rainbow-container {
+    position: fixed;
+    bottom: -100px;
+    right: -100px;
+    width: 900px;
+    height: 900px;
+    pointer-events: none;
+    z-index: -2; /* Nằm sau các hiệu ứng khác */
+    opacity: 0;
+    filter: blur(30px);
+    transition: opacity 8s ease, filter 15s ease;
+    
+    background: radial-gradient(circle at 100% 100%,
+        transparent 0, transparent 40%,
+        rgba(148, 0, 211, 0.25) 42%,
+        rgba(75, 0, 130, 0.25) 44%,
+        rgba(0, 0, 255, 0.25) 46%,
+        rgba(0, 255, 0, 0.25) 48%,
+        rgba(255, 255, 0, 0.25) 50%,
+        rgba(255, 127, 0, 0.25) 52%,
+        rgba(255, 0, 0, 0.25) 54%,
+        transparent 56%
+    );
+}
+
+#rainbow-container.show {
+    opacity: 1;
+    filter: blur(5px);
+}
+
+/* ===== MUSIC PLAYER STYLES ===== */
+#music-player {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 700px;
+    height: 450px;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 15px;
+    z-index: 10010;
+    display: none;
+    flex-direction: column;
+    color: white;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+    box-shadow: 0 15px 45px rgba(0,0,0,0.6);
+    user-select: none;
+}
+#music-player.show { display: flex; }
+
+.player-header {
+    padding: 15px 20px;
+    background: rgba(255, 255, 255, 0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: move;
+}
+.header-title { font-weight: bold; letter-spacing: 1px; }
+
+.header-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+#music-player select {
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 4px;
+    padding: 4px;
+}
+
+.player-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.player-body .section {
+    flex: 1;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.player-body .divider {
+    flex: none;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 10px 0;
+}
+
+.music-list {
+    flex: 1;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 5px;
+}
+
+.music-item {
+    padding: 8px 12px;
+    margin: 4px 0;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    cursor: grab;
+    font-size: 13px;
+    transition: background 0.2s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.music-item:hover { background: rgba(255, 255, 255, 0.15); }
+.music-item:active { cursor: grabbing; }
+.music-item.playing {
+    background: rgba(255, 165, 0, 0.3);
+    border-left: 3px solid orange;
+}
+
+/* Scrollbar cho music list */
+.music-list::-webkit-scrollbar { width: 6px; }
+.music-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+}

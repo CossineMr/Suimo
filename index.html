@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Slime Pet</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Hiệu ứng bão (Mưa, Sét, Mây xám) -->
+  <div id="storm-container">
+    <div id="dark-overlay"></div>
+    <div id="lightning-layer"></div>
+    <div id="storm-clouds">
+      <div class="storm-cloud cloud-top-1"></div>
+      <div class="storm-cloud cloud-top-2"></div>
+      <div class="storm-cloud cloud-top-3"></div>
+    </div>
+    <div id="rain-layer"></div>
+  </div>
+
+  <!-- Hiệu ứng cầu vồng -->
+  <div id="rainbow-container"></div>
+
+  <!-- Hiệu ứng tia nắng -->
+  <div id="sunbeam-container">
+    <div id="sunbeams"></div>
+  </div>
+
+  <!-- Hiệu ứng mây trôi -->
+  <div id="clouds">
+    <div class="cloud cloud-1"></div>
+    <div class="cloud cloud-2"></div>
+    <div class="cloud cloud-3"></div>
+    <div class="cloud cloud-4"></div>
+  </div>
+
+  <!-- Hiệu ứng tia nắng -->
+
+  <!-- Vùng dò tìm cạnh phải -->
+  <div id="right-edge-detector" class="interactive"></div>
+
+  <!-- Draw mode indicator (Space key) -->
+  <div id="drawIndicator">
+    <span id="drawIndicatorIcon">⌨️</span>
+    <span id="drawStatus">Giữ Space để vẽ sàn</span>
+  </div>
+
+  <!-- Ký hiệu nhạc đang phát -->
+  <div id="music-status" class="interactive">
+    <span id="music-icon">🎵</span>
+  </div>
+
+  <!-- Giao diện công cụ góc phải -->
+  <div id="controls" class="interactive">
+    <button id="quitBtn">❌ Thoát</button>
+  </div>
+
+  <!-- Bé Sui -->
+  <img id="slime" class="interactive" src="assets/Suimo.png" alt="Slime">
+
+  <!-- Trình phát nhạc -->
+  <div id="music-player" class="interactive">
+    <div class="player-header">
+      <span class="header-title">Music Player 🎧</span>
+      <div class="header-controls">
+        <button id="playBtn" title="Phát/Tạm dừng">▶️</button>
+        <select id="sortMode" title="Chế độ sắp xếp">
+          <option value="manual">Tự sắp xếp</option>
+          <option value="auto">Sắp xếp tự động</option>
+          <option value="random">Sắp xếp ngẫu nhiên</option>
+        </select>
+        <button id="closeMusicBtn">✖️</button>
+      </div>
+    </div>
+    <div class="player-body">
+      <div class="section">
+        <h4>Thư viện nhạc</h4>
+        <div id="library-list" class="music-list"></div>
+      </div>
+      <div class="section divider"></div>
+      <div class="section">
+        <h4>Danh sách phát</h4>
+        <div id="playlist-list" class="music-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
