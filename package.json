@@ -4,9 +4,33 @@
   "description": "Slime Desktop Pet",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.cossinemr.suimo",
+    "productName": "Suimo",
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "assets/Slime_Sui.svg"
+    },
+    "files": [
+      "**/*",
+      "assets/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    }
   },
   "dependencies": {
     "electron": "^29.0.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/cli": "^2.10.1",
+    "electron-builder": "^24.13.3"
   }
 }

@@ -319,6 +319,21 @@ const MusicPlayer = {
 
     async refreshLibrary() {
         this.library = await ipcRenderer.invoke('get-audio-files', 'music');
+        this.originalLibrary = [...this.library];
+        this.applySortMode();
+    },
+
+    applySortMode() {
+        const sortSelect = document.getElementById('sortMode');
+        if (!sortSelect) return;
+        const mode = sortSelect.value;
+        if (mode === 'auto') {
+            this.library = [...this.originalLibrary].sort((a, b) => a.localeCompare(b));
+        } else if (mode === 'random') {
+            this.library = [...this.originalLibrary].sort(() => Math.random() - 0.5);
+        } else if (mode === 'manual') {
+            this.library = [...this.originalLibrary];
+        }
         this.renderLibrary();
     },
 
@@ -376,14 +391,7 @@ const MusicPlayer = {
         
         const sortSelect = document.getElementById('sortMode');
         sortSelect.onchange = () => {
-            const mode = sortSelect.value;
-            if (mode === 'auto') {
-                AudioManager.playlist = [...this.library];
-                this.renderPlaylist();
-            } else if (mode === 'random') {
-                AudioManager.playlist = [...this.library].sort(() => Math.random() - 0.5);
-                this.renderPlaylist();
-            }
+            this.applySortMode();
         };
 
         // Drag and Drop files
@@ -777,23 +785,23 @@ function updateAutonomousBehavior() {
         // Nếu đang nấp thì nhảy lên lại sau khi xong
         slime.state = 'WANDERING';
         slime.vy = -15; // Nhảy bật lên từ dưới sàn
-        slime.vx = (Math.random() > 0.5 ? 2 : -2);
+        slime.vx = (Math.random() > 0.5 ? 2.5 : -2.5);
         slime.stateTimer = Date.now() + 3000 + Math.random() * 3000;
         spawnEmote('✨');
-    } else if (rand < 0.15) {
-        // 15% vào trạng thái nấp dưới taskbar
+    } else if (rand < 0.1) {
+        // 10% vào trạng thái nấp dưới taskbar
         slime.state = 'HIDING';
         slime.vx = 0;
         slime.stateTimer = Date.now() + 3000 + Math.random() * 2000;
         spawnEmote('...');
-    } else if (rand < 0.6) {
-        // 45% lang thang
+    } else if (rand < 0.7) {
+        // 60% lang thang (tăng từ 45%)
         slime.state = 'WANDERING';
-        slime.vx = (Math.random() > 0.5 ? 1 : -1) * (0.8 + Math.random() * 1.2);
+        slime.vx = (Math.random() > 0.5 ? 1 : -1) * (1.2 + Math.random() * 1.8);
         slime.stateTimer = Date.now() + 4000 + Math.random() * 5000;
         slime.facingRight = slime.vx > 0;
     } else {
-        // 40% đứng yên
+        // 30% đứng yên
         slime.state = 'IDLE';
         slime.vx = 0;
         slime.stateTimer = Date.now() + 2000 + Math.random() * 3000;
@@ -807,6 +815,7 @@ function updateAutonomousBehavior() {
 // ==== VẬT LÝ ====
 
 slimeEl.onload = () => {
+    slime.w = slimeEl.clientWidth || 150;
     slime.h = slimeEl.clientHeight || 100;
     detectBottomPadding(slimeEl);
     prepareSlimeHitData();
@@ -987,6 +996,13 @@ function gameLoop() {
     slime.y = nextY;
     slimeEl.style.left = slime.x + 'px';
     slimeEl.style.top = slime.y + 'px';
+
+    // Thêm hiệu ứng nhún nhảy khi di chuyển
+    if (Math.abs(slime.vx) > 0.1 && !slime.inAir) {
+        slimeEl.classList.add('moving');
+    } else {
+        slimeEl.classList.remove('moving');
+    }
 }
 
 requestAnimationFrame(gameLoop);
