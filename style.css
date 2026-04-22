@@ -132,6 +132,7 @@ button:hover {
 
 .sui-wobble {
     animation: suiWobble 0.65s ease-in-out;
+    transform-origin: bottom center;
 }
 
 .sui-squish {
@@ -783,6 +784,58 @@ button:hover {
 #rainbow-container.show {
     opacity: 1;
     filter: blur(5px);
+}
+
+/* ===== EXCLAMATION MARK ===== */
+@keyframes bounceExclamation {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.exclamation-mark {
+    position: absolute;
+    font-size: 40px;
+    font-weight: bold;
+    color: #ffcc00;
+    text-shadow: 2px 2px 0 #ff0000, -2px -2px 0 #ff0000, 2px -2px 0 #ff0000, -2px 2px 0 #ff0000;
+    cursor: pointer;
+    z-index: 10001;
+    animation: bounceExclamation 1s infinite;
+    pointer-events: auto;
+}
+
+.exclamation-mark:hover {
+    transform: scale(1.2);
+    animation: none;
+}
+
+/* ===== FALLING GIFT BOX ===== */
+@keyframes fallGift {
+    0% { top: -200px; }
+    100% { top: calc(100vh - 160px); }
+}
+
+@keyframes giftSway {
+    0%, 100% { transform: rotate(-12deg) translateX(-20px); }
+    50% { transform: rotate(12deg) translateX(20px); }
+}
+
+.falling-gift {
+    position: fixed;
+    width: 150px;
+    height: auto;
+    z-index: 10002;
+    pointer-events: none;
+    animation: fallGift 3s ease-in forwards, giftSway 2s ease-in-out infinite;
+}
+
+.present-landed {
+    position: fixed;
+    width: 150px;
+    height: auto;
+    z-index: 10002;
+    pointer-events: auto;
+    cursor: pointer;
 }
 
 /* ===== MUSIC PLAYER STYLES ===== */

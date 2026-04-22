@@ -3,10 +3,3 @@
 2. Đóng gói thành file .exe
     npm run dist
 3. Thu được output file trong thư mục dist
-
-
-Cài đặt Tauri CLI:
-    npm install -D @tauri-apps/cli @tauri-apps/api
-
-Khởi tạo Tauri:
-    npx tauri init

@@ -2,8 +2,8 @@ const { ipcRenderer } = require('electron');
 
 const slimeEl = document.getElementById('slime');
 const drawIndicator = document.getElementById('drawIndicator');
-const drawStatusEl  = document.getElementById('drawStatus');
-const drawIconEl    = document.getElementById('drawIndicatorIcon');
+const drawStatusEl = document.getElementById('drawStatus');
+const drawIconEl = document.getElementById('drawIndicatorIcon');
 const quitBtn = document.getElementById('quitBtn');
 const edgeDetector = document.getElementById('right-edge-detector');
 const controls = document.getElementById('controls');
@@ -32,14 +32,14 @@ let platforms = []; // Array of {x, y, width, height, el}
 let workArea = { width: window.innerWidth, height: window.innerHeight };
 
 // Sàn thực (trừ taskbar) — sẽ được cập nhật từ main process
-let floorY = window.innerHeight; 
+let floorY = window.innerHeight;
 ipcRenderer.on('work-area-height', (_event, h) => {
     floorY = h;
     workArea.height = h; // Đồng bộ workArea
     console.log('[SlimePet] floorY dã cập nhật:', floorY);
 });
 // Request ngay khi có thể
-ipcRenderer.invoke('get-work-area-height').then(h => { 
+ipcRenderer.invoke('get-work-area-height').then(h => {
     if (h) {
         floorY = h;
         workArea.height = h;
@@ -48,8 +48,8 @@ ipcRenderer.invoke('get-work-area-height').then(h => {
 
 
 let slime = {
-    x: workArea.width / 2, y: 0, 
-    vx: 0, vy: 0, 
+    x: workArea.width / 2, y: 0,
+    vx: 0, vy: 0,
     w: 150, h: 100,
     isDragging: false,
     inAir: true,
@@ -154,7 +154,7 @@ function applyHoverLogic(el) {
         // Pixel-perfect check cho bé Sui
         el.addEventListener('mousemove', (e) => {
             if (isDrawingMode || slime.isDragging) return;
-            
+
             // Dự phòng nếu hit data chưa kịp chuẩn bị
             if (!slimePixelData && slimeEl.naturalWidth) {
                 prepareSlimeHitData();
@@ -174,7 +174,7 @@ function applyHoverLogic(el) {
                 }
             }
         });
-        
+
         el.addEventListener('mouseleave', () => {
             if (isSlimeHovered) {
                 isSlimeHovered = false;
@@ -187,10 +187,10 @@ function applyHoverLogic(el) {
     } else {
         // Các thành phần UI khác dùng bounding box bình thường
         el.addEventListener('mouseenter', () => {
-            if(!isDrawingMode && !slime.isDragging) ipcRenderer.send('set-ignore-mouse-events', false);
+            if (!isDrawingMode && !slime.isDragging) ipcRenderer.send('set-ignore-mouse-events', false);
         });
         el.addEventListener('mouseleave', () => {
-            if(!isDrawingMode && !slime.isDragging) ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
+            if (!isDrawingMode && !slime.isDragging) ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
         });
     }
 }
@@ -199,578 +199,22 @@ applyHoverLogic(slimeEl);
 
 quitBtn.addEventListener('click', () => ipcRenderer.send('quit-app'));
 
-// ==== AM THANH & NHAC (AUDIO MANAGER) ====
-const AudioManager = {
-    sfx: {},
-    music: new Audio(),
-    isPlayingMusic: false,
-    playlist: [],
-    currentIndex: -1,
-    
-    init() {
-        this.music.onended = () => this.playNext();
-        this.fadeIntervals = {};
-        console.log('[AudioManager] Da khoi tao.');
-    },
+// ==== AM THANH & NHAC (AUDIO MANAGER) & TRINH PHAT NHAC (MUSIC PLAYER UI) DA DUOC CHUYEN SANG music_player.js ====
 
-    playSFX(name, loop = false, fadeIn = false) {
-        if (!loop) {
-            // Khong loop (VD: Sét) -> Tao instance moi de cho phep trung am thanh (overlap)
-            const audio = new Audio(`assets/audio/sfx/${name}.mp3`);
-            audio.play().catch(e => console.warn(`[SFX] Khong the phat ${name}:`, e));
-            return;
-        }
-
-        // Loop (VD: Mưa, Chim) -> Luu vao sfx de co the stop hoac fade
-        if (!this.sfx[name]) {
-            this.sfx[name] = new Audio(`assets/audio/sfx/${name}.mp3`);
-        }
-        this.sfx[name].loop = loop;
-        
-        if (fadeIn) {
-            this.sfx[name].volume = 0;
-            this.sfx[name].play().catch(e => console.warn(`[SFX] Khong the phat ${name}:`, e));
-            
-            if (this.fadeIntervals[name]) clearInterval(this.fadeIntervals[name]);
-            
-            this.fadeIntervals[name] = setInterval(() => {
-                let v = this.sfx[name].volume;
-                if (v < 0.95) {
-                    this.sfx[name].volume = v + 0.02; // Tang dan
-                } else {
-                    this.sfx[name].volume = 1.0;
-                    clearInterval(this.fadeIntervals[name]);
-                }
-            }, 100); // 100ms * 50 steps = 5s de dat max volume
-        } else {
-            this.sfx[name].volume = 1.0;
-            this.sfx[name].play().catch(e => console.warn(`[SFX] Khong the phat ${name}:`, e));
-        }
-    },
-
-    stopSFX(name, fadeOut = false) {
-        if (this.sfx[name]) {
-            if (fadeOut) {
-                if (this.fadeIntervals[name]) clearInterval(this.fadeIntervals[name]);
-                
-                this.fadeIntervals[name] = setInterval(() => {
-                    let v = this.sfx[name].volume;
-                    if (v > 0.05) {
-                        this.sfx[name].volume = v - 0.05; // Giam dan
-                    } else {
-                        this.sfx[name].volume = 0;
-                        this.sfx[name].pause();
-                        this.sfx[name].currentTime = 0;
-                        clearInterval(this.fadeIntervals[name]);
-                    }
-                }, 100);
-            } else {
-                this.sfx[name].pause();
-                this.sfx[name].currentTime = 0;
-            }
-        }
-    },
-
-    playMusic(index) {        if (index < 0 || index >= this.playlist.length) return;
-        this.currentIndex = index;
-        this.music.src = `assets/audio/music/${this.playlist[index]}`;
-        this.music.play().then(() => {
-            this.isPlayingMusic = true;
-            this.updateUI();
-        }).catch(e => console.error('[Music] Loi phat nhac:', e));
-    },
-
-    togglePlay() {
-        if (this.playlist.length === 0) return;
-        if (this.currentIndex === -1) this.currentIndex = 0;
-
-        if (this.music.paused) {
-            if (!this.music.src) this.playMusic(this.currentIndex);
-            else this.music.play();
-            this.isPlayingMusic = true;
-        } else {
-            this.music.pause();
-            this.isPlayingMusic = false;
-        }
-        this.updateUI();
-    },
-
-    playNext() {
-        let next = this.currentIndex + 1;
-        if (next >= this.playlist.length) next = 0;
-        this.playMusic(next);
-    },
-
-    updateUI() {
-        const musicStatus = document.getElementById('music-status');
-        const playBtn = document.getElementById('playBtn');
-        
-        if (this.isPlayingMusic && !this.music.paused) {
-            musicStatus.style.display = 'flex';
-            playBtn.textContent = '⏸️';
-        } else {
-            musicStatus.style.display = 'none';
-            playBtn.textContent = '▶️';
-        }
-
-        // Highlight dang phat
-        document.querySelectorAll('#playlist-list .music-item').forEach((el, idx) => {
-            if (idx === this.currentIndex) el.classList.add('playing');
-            else el.classList.remove('playing');
-        });
-    }
-};
-AudioManager.init();
-
-// ==== TRINH PHAT NHAC (MUSIC PLAYER UI) ====
-const MusicPlayer = {
-    library: [],
-    el: null,
-    isOpen: false,
-    isDraggingWindow: false,
-    dragOffset: { x: 0, y: 0 },
-
-    init() {
-        this.el = document.getElementById('music-player');
-        this.setupEventListeners();
-        this.refreshLibrary();
-    },
-
-    async refreshLibrary() {
-        this.library = await ipcRenderer.invoke('get-audio-files', 'music');
-        this.originalLibrary = [...this.library];
-        this.renderLibrary();
-    },
-
-    executeSort() {
-        const mode = this.currentSortMode || 'manual';
-        if (mode === 'default') {
-            AudioManager.playlist = [...this.originalLibrary];
-            this.renderPlaylist();
-        } else if (mode === 'random') {
-            AudioManager.playlist.sort(() => Math.random() - 0.5);
-            this.renderPlaylist();
-        } else if (mode === 'manual') {
-            // Giữ nguyên vị trí hiện tại
-            this.renderPlaylist();
-        }
-    },
-
-    getDragAfterElement(container, y) {
-        const draggableElements = [...container.querySelectorAll('.music-item')];
-        return draggableElements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = y - box.top - box.height / 2;
-            if (offset < 0 && offset > closest.offset) {
-                return { offset: offset, element: child };
-            } else {
-                return closest;
-            }
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
-    },
-
-    // Removed applySortMode
-
-    renderLibrary() {
-        const list = document.getElementById('library-list');
-        list.innerHTML = '';
-        this.library.forEach(file => {
-            const item = document.createElement('div');
-            item.className = 'music-item';
-            item.textContent = file;
-            item.draggable = true;
-            item.addEventListener('dragstart', (e) => {
-                e.dataTransfer.setData('source', 'library');
-                e.dataTransfer.setData('text/plain', file);
-            });
-            item.addEventListener('dblclick', () => {
-                // Double click de them vao playlist
-                this.addToPlaylist(file);
-            });
-            list.appendChild(item);
-        });
-    },
-
-    addToPlaylist(file) {
-        AudioManager.playlist.push(file);
-        this.renderPlaylist();
-    },
-
-    renderPlaylist() {
-        const list = document.getElementById('playlist-list');
-        list.innerHTML = '';
-        AudioManager.playlist.forEach((file, idx) => {
-            const item = document.createElement('div');
-            item.className = 'music-item';
-            item.textContent = `${idx + 1}. ${file}`;
-            item.dataset.file = file;
-            item.draggable = true;
-            item.addEventListener('dragstart', (e) => {
-                e.dataTransfer.setData('source', 'playlist');
-                e.dataTransfer.setData('idx', idx.toString());
-            });
-            item.addEventListener('click', () => AudioManager.playMusic(idx));
-            list.appendChild(item);
-        });
-        AudioManager.updateUI();
-    },
-
-    toggle() {
-        this.isOpen = !this.isOpen;
-        if (this.isOpen) {
-            this.el.classList.add('show');
-            ipcRenderer.send('set-ignore-mouse-events', false);
-        } else {
-            this.el.classList.remove('show');
-            if (!isDrawingMode && !slime.isDragging) ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
-        }
-    },
-
-    setupEventListeners() {
-        document.getElementById('closeMusicBtn').onclick = () => this.toggle();
-        document.getElementById('playBtn').onclick = () => AudioManager.togglePlay();
-        document.getElementById('refreshLibraryBtn').onclick = () => this.refreshLibrary();
-        
-        const sortActionBtn = document.getElementById('sortActionBtn');
-        const sortDropdownBtn = document.getElementById('sortDropdownBtn');
-        const sortDropdownMenu = document.getElementById('sortDropdownMenu');
-        const modeItems = sortDropdownMenu.querySelectorAll('div');
-
-        this.currentSortMode = 'manual';
-
-        sortDropdownBtn.onclick = (e) => {
-            e.stopPropagation();
-            sortDropdownMenu.classList.toggle('show');
-        };
-
-        window.addEventListener('click', () => {
-            if (sortDropdownMenu.classList.contains('show')) {
-                sortDropdownMenu.classList.remove('show');
-            }
-        });
-
-        modeItems.forEach(item => {
-            item.onclick = (e) => {
-                e.stopPropagation();
-                this.currentSortMode = item.dataset.mode;
-                sortActionBtn.textContent = item.textContent;
-                
-                modeItems.forEach(i => i.classList.remove('active'));
-                item.classList.add('active');
-                
-                sortDropdownMenu.classList.remove('show');
-            }
-        });
-
-        sortActionBtn.onclick = () => {
-            this.executeSort();
-        };
-
-        // Drag and Drop files
-        const playlistList = document.getElementById('playlist-list');
-        playlistList.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            const afterElement = this.getDragAfterElement(playlistList, e.clientY);
-            const items = playlistList.querySelectorAll('.music-item');
-            items.forEach(item => item.classList.remove('drag-over-top', 'drag-over-bottom'));
-            
-            if (afterElement) {
-                afterElement.classList.add('drag-over-top');
-            } else if (items.length > 0) {
-                items[items.length - 1].classList.add('drag-over-bottom');
-            }
-        });
-        
-        playlistList.addEventListener('dragleave', (e) => {
-            const items = playlistList.querySelectorAll('.music-item');
-            items.forEach(item => item.classList.remove('drag-over-top', 'drag-over-bottom'));
-        });
-
-        playlistList.addEventListener('drop', (e) => {
-            e.preventDefault();
-            const items = playlistList.querySelectorAll('.music-item');
-            items.forEach(item => item.classList.remove('drag-over-top', 'drag-over-bottom'));
-
-            const source = e.dataTransfer.getData('source');
-            const afterElement = this.getDragAfterElement(playlistList, e.clientY);
-            
-            // Keep track of current playing song to preserve index
-            const currentPlayingSong = (AudioManager.currentIndex >= 0 && AudioManager.currentIndex < AudioManager.playlist.length) 
-                                        ? AudioManager.playlist[AudioManager.currentIndex] 
-                                        : null;
-
-            if (source === 'library') {
-                const file = e.dataTransfer.getData('text/plain');
-                if (!file) return;
-                
-                if (afterElement) {
-                    const insertIdx = AudioManager.playlist.indexOf(afterElement.dataset.file);
-                    AudioManager.playlist.splice(insertIdx, 0, file);
-                } else {
-                    AudioManager.playlist.push(file);
-                }
-            } else if (source === 'playlist') {
-                const dragIdx = parseInt(e.dataTransfer.getData('idx'), 10);
-                if (isNaN(dragIdx)) return;
-                
-                const file = AudioManager.playlist[dragIdx];
-                AudioManager.playlist.splice(dragIdx, 1);
-                
-                if (afterElement) {
-                    // Recalculate index after splice since the array mutated
-                    const insertIdx = AudioManager.playlist.indexOf(afterElement.dataset.file);
-                    AudioManager.playlist.splice(insertIdx, 0, file);
-                } else {
-                    AudioManager.playlist.push(file);
-                }
-            }
-            
-            if (currentPlayingSong) {
-                AudioManager.currentIndex = AudioManager.playlist.indexOf(currentPlayingSong);
-            }
-            
-            this.renderPlaylist();
-        });
-
-        // Di chuyen cua so
-        const header = this.el.querySelector('.player-header');
-        header.onmousedown = (e) => {
-            this.isDraggingWindow = true;
-            this.dragOffset.x = e.clientX - this.el.offsetLeft;
-            this.dragOffset.y = e.clientY - this.el.offsetTop;
-            header.style.cursor = 'grabbing';
-        };
-
-        window.addEventListener('mousemove', (e) => {
-            if (!this.isDraggingWindow) return;
-            this.el.style.left = (e.clientX - this.dragOffset.x) + 'px';
-            this.el.style.top = (e.clientY - this.dragOffset.y) + 'px';
-            this.el.style.transform = 'none'; // Huy transform translate(-50%, -50%) khi keo
-        });
-
-        window.addEventListener('mouseup', () => {
-            this.isDraggingWindow = false;
-            header.style.cursor = 'move';
-        });
-    }
-};
-document.addEventListener('DOMContentLoaded', () => MusicPlayer.init());
 
 // ==== CHẾ ĐỘ VẼ BẬC THANG (GIỮ PHÍM SPACE) ====
 let isSpaceHeld = false;
 
-// ==== HỆ THỐNG BÃO (STORM SYSTEM) ====
-const StormSystem = {
-    state: 'IDLE',
-    intensityMode: 'SMALL',
-    startTime: 0,
-    duration: 0,
-    preparingTimer: null,
-    lightningTimer: null,
-    rainLayer: null,
-    lightningLayer: null,
-    container: null,
-    
-    lastStormStopTime: 0,
-    
-    config: {
-        SMALL: { maxDrops: 60, lightningFreq: 0 },
-        MEDIUM: { maxDrops: 200, lightningFreq: 1 },
-        HEAVY: { maxDrops: 500, lightningFreq: 3 }
-    },
-
-    init() {
-        this.container = document.getElementById('storm-container');
-        this.rainLayer = document.getElementById('rain-layer');
-        this.lightningLayer = document.getElementById('lightning-layer');
-        this.rainbowContainer = document.getElementById('rainbow-container');
-        console.log('[StormSystem] Da khoi tao.');
-    },
-
-    toggle(forcedMode = null) {
-        if (this.state === 'IDLE' || forcedMode) {
-            this.start(forcedMode);
-        } else {
-            this.stop();
-        }
-    },
-
-    start(mode = null) {
-        this.stop(); // Reset neu dang chay
-        this.state = 'PREPARING';
-        this.intensityMode = mode || (['SMALL', 'MEDIUM', 'HEAVY'][Math.floor(Math.random() * 3)]);
-        
-        this.container.classList.add('storm-active');
-        spawnEmote('☁️');
-        console.log(`[Storm] Dang chuan bi... Cap do: ${this.intensityMode}`);
-
-        // Stop Chirp when storm starts
-        AudioManager.stopSFX('Chirp');
-
-        this.preparingTimer = setTimeout(() => {
-            this.beginRaining();
-        }, 5000);
-    },
-
-    beginRaining() {
-        if (this.state !== 'PREPARING') return;
-        this.state = 'RAINING';
-        this.startTime = Date.now();
-        this.duration = (2 + Math.random() * 3) * 60 * 1000; // 2-5 phut
-        console.log(`[Storm] Bat dau mua! Cap do: ${this.intensityMode}, Thoi gian: ${(this.duration / 60000).toFixed(1)} phut`);
-        
-        AudioManager.playSFX('Rain', true, true); // loop=true, fadeIn=true
-        
-        this.scheduleLightning();
-        this.updateRain();
-    },
-
-    updateRain() {
-        if (this.state !== 'RAINING') return;
-
-        const elapsed = Date.now() - this.startTime;
-        if (elapsed > this.duration) {
-            this.stop();
-            return;
-        }
-
-        // Tinh mat do theo parabol: y = -4(x-0.5)^2 + 1
-        const x = elapsed / this.duration;
-        const multiplier = -4 * Math.pow(x - 0.5, 2) + 1;
-        const currentMaxDrops = this.config[this.intensityMode].maxDrops * Math.max(0.05, multiplier);
-
-        this.adjustRainDensity(currentMaxDrops);
-        requestAnimationFrame(() => this.updateRain());
-    },
-
-    adjustRainDensity(targetCount) {
-        const currentCount = this.rainLayer.children.length;
-        if (currentCount < targetCount) {
-            const toAdd = Math.min(10, targetCount - currentCount);
-            for (let i = 0; i < toAdd; i++) {
-                this.createRaindrop();
-            }
-        }
-    },
-
-    createRaindrop() {
-        const drop = document.createElement('div');
-        drop.className = 'raindrop';
-        // Mở rộng vùng sinh hạt sang phải (thêm 600px) để bù cho độ trượt sang trái khi rơi
-        const spawnWidth = window.innerWidth + 600;
-        drop.style.left = (Math.random() * spawnWidth) + 'px';
-        drop.style.top = '-20px';
-        const duration = 0.4 + Math.random() * 0.4;
-        drop.style.animation = `rainFall ${duration}s linear forwards`;
-        this.rainLayer.appendChild(drop);
-        drop.addEventListener('animationend', () => drop.remove());
-    },
-
-    scheduleLightning() {
-        if (this.state !== 'RAINING') return;
-        const freq = this.config[this.intensityMode].lightningFreq;
-        if (freq === 0) return;
-
-        const interval = (60 / freq) * 1000;
-        const nextIn = Math.random() * interval * 1.5; 
-
-        this.lightningTimer = setTimeout(() => {
-            if (this.state === 'RAINING') {
-                this.triggerLightning();
-                this.scheduleLightning();
-            }
-        }, nextIn);
-    },
-
-    triggerLightning() {
-        console.log('[Storm] Sét đánh!');
-        AudioManager.playSFX('Lightning');
-        const x = Math.random() * 100;
-        const duration = 1 + Math.random() * 0.5; // 1-1.5s
-        
-        this.lightningLayer.style.setProperty('--lightning-x', `${x}%`);
-        this.lightningLayer.style.setProperty('--lightning-duration', `${duration}s`);
-        
-        this.lightningLayer.classList.remove('lightning-active');
-        void this.lightningLayer.offsetWidth; 
-        this.lightningLayer.classList.add('lightning-active');
-    },
-
-    stop() {
-        if (this.state !== 'IDLE') {
-            console.log('[Storm] Dung bao.');
-            this.lastStormStopTime = Date.now();
-        }
-        this.state = 'IDLE';
-        if (this.container) this.container.classList.remove('storm-active');
-        if (this.preparingTimer) clearTimeout(this.preparingTimer);
-        if (this.lightningTimer) clearTimeout(this.lightningTimer);
-        if (this.rainLayer) this.rainLayer.innerHTML = '';
-        if (this.lightningLayer) this.lightningLayer.classList.remove('lightning-active');
-        
-        AudioManager.stopSFX('Rain', true); // fadeOut=true
-        // Restart Chirp if sun is showing
-        const sunbeamContainer = document.getElementById('sunbeam-container');
-        if (sunbeamContainer && sunbeamContainer.classList.contains('show')) {
-            AudioManager.playSFX('Chirp', true);
-        }
-    },
-
-    showRainbow() {
-        if (!this.rainbowContainer) return;
-        console.log('[Storm] Cau vong xuat hien!');
-        this.rainbowContainer.classList.add('show');
-        setTimeout(() => {
-            this.rainbowContainer.classList.remove('show');
-        }, 60000); // Bien mat sau 1 phut
-    }
-};
-
-// Khoi tao ngay
-document.addEventListener('DOMContentLoaded', () => StormSystem.init());
-// Du phong neu script chay sau DOMContentLoaded
-if (document.readyState !== 'loading') StormSystem.init();
+// ==== HỆ THỐNG BÃO & HIỆU ỨNG THỜI TIẾT ĐÃ ĐƯỢC CHUYỂN SANG features/weather_effects.js ====
 
 window.addEventListener('keydown', (e) => {
-    // Phím số 1: Trời quang
-    if (e.code === 'Digit1' || e.code === 'Numpad1') {
-        const sunbeamContainer = document.getElementById('sunbeam-container');
-        const clouds = document.getElementById('clouds');
-        if (sunbeamContainer && clouds) {
-            const isShowing = sunbeamContainer.classList.toggle('show');
-            clouds.classList.toggle('show');
-            console.log('[SlimePet] Che do Troi quang:', isShowing ? 'BAT' : 'TAT');
-
-            if (isShowing && StormSystem.state === 'IDLE') {
-                AudioManager.playSFX('Chirp', true);
-            } else {
-                AudioManager.stopSFX('Chirp');
-            }
-
-            // Neu bat nang trong vong 10s sau khi tat mua thi hien cau vong
-            const stormRecentlyStopped = (Date.now() - StormSystem.lastStormStopTime) < 10000;
-            if (isShowing && stormRecentlyStopped) {
-                StormSystem.showRainbow();
-            }
-        }
-    }
-
-    // Phím số 2: Mưa Bão (Ngẫu nhiên)
-    if (e.code === 'Digit2' || e.code === 'Numpad2') {
-        StormSystem.toggle();
-    }
-
-    // Phím Z, X, C: Ép buộc các cấp độ mưa
     if (isDrawingMode) return; // Khong bat khi dang ve
     const key = e.key.toLowerCase();
-    if (key === 'z') StormSystem.start('SMALL');
-    if (key === 'x') StormSystem.start('MEDIUM');
-    if (key === 'c') StormSystem.start('HEAVY');
     if (key === 'm') MusicPlayer.toggle();
 
     if (e.code !== 'Space' || isSpaceHeld || e.repeat) return;
     e.preventDefault();
-    isSpaceHeld   = true;
+    isSpaceHeld = true;
     isDrawingMode = true;
     ipcRenderer.send('set-ignore-mouse-events', false);
     // Hien lai cac platform, xoa timer cu
@@ -779,8 +223,8 @@ window.addEventListener('keydown', (e) => {
         p.el.classList.remove('hidden');
     });
     // Indicator -> san sang
-    drawIndicator.className  = 'ready';
-    drawIconEl.textContent   = '🎯';
+    drawIndicator.className = 'ready';
+    drawIconEl.textContent = '🎯';
     drawStatusEl.textContent = 'Keo chuot de ve san';
 });
 
@@ -796,10 +240,10 @@ window.addEventListener('keyup', (e) => {
         drawBoxDiv = null;
         if (rect.width > 20 && rect.height > 20) {
             const platformDiv = document.createElement('div');
-            platformDiv.className    = 'platform interactive';
-            platformDiv.style.left   = rect.left   + 'px';
-            platformDiv.style.top    = rect.top    + 'px';
-            platformDiv.style.width  = rect.width  + 'px';
+            platformDiv.className = 'platform interactive';
+            platformDiv.style.left = rect.left + 'px';
+            platformDiv.style.top = rect.top + 'px';
+            platformDiv.style.width = rect.width + 'px';
             platformDiv.style.height = rect.height + 'px';
             applyHoverLogic(platformDiv);
             document.body.appendChild(platformDiv);
@@ -831,9 +275,9 @@ window.addEventListener('mousedown', (e) => {
     if (!isDrawingMode || e.target.closest('#controls')) return;
 
     if (e.button === 2) { // Bấm chuột phải để xóa platform
-        for(let i=0; i<platforms.length; i++) {
+        for (let i = 0; i < platforms.length; i++) {
             let p = platforms[i];
-            if(e.clientX >= p.x && e.clientX <= p.x + p.width && e.clientY >= p.y && e.clientY <= p.y + p.height) {
+            if (e.clientX >= p.x && e.clientX <= p.x + p.width && e.clientY >= p.y && e.clientY <= p.y + p.height) {
                 p.el.remove();
                 platforms.splice(i, 1);
                 return;
@@ -845,7 +289,7 @@ window.addEventListener('mousedown', (e) => {
     isDrawingBox = true;
     startX = e.clientX;
     startY = e.clientY;
-    
+
     drawBoxDiv = document.createElement('div');
     drawBoxDiv.id = 'draw-box';
     drawBoxDiv.style.left = startX + 'px';
@@ -853,8 +297,8 @@ window.addEventListener('mousedown', (e) => {
     document.body.appendChild(drawBoxDiv);
 
     // Indicator -> dang ve
-    drawIndicator.className  = 'drawing';
-    drawIconEl.textContent   = '✏️';
+    drawIndicator.className = 'drawing';
+    drawIconEl.textContent = '✏️';
     drawStatusEl.textContent = 'Đang vẽ...';
 });
 
@@ -871,32 +315,77 @@ window.addEventListener('mousemove', (e) => {
 window.addEventListener('mouseup', (e) => {
     if (!isDrawingBox) return;
     isDrawingBox = false;
-    
+
     let rect = drawBoxDiv.getBoundingClientRect();
-    if(rect.width > 20 && rect.height > 20) {
+    if (rect.width > 20 && rect.height > 20) {
         let platformDiv = document.createElement('div');
         platformDiv.className = 'platform interactive';
         platformDiv.style.left = rect.left + 'px';
         platformDiv.style.top = rect.top + 'px';
         platformDiv.style.width = rect.width + 'px';
         platformDiv.style.height = rect.height + 'px';
-        
+
         applyHoverLogic(platformDiv);
         document.body.appendChild(platformDiv);
 
         let newPlatform = { x: rect.left, y: rect.top, width: rect.width, height: rect.height, el: platformDiv, timer: null };
         platforms.push(newPlatform);
     }
-    
+
     drawBoxDiv.remove();
     drawBoxDiv = null;
 
     // Neu van giu Space -> tro lai san sang
     if (isSpaceHeld) {
-        drawIndicator.className  = 'ready';
-        drawIconEl.textContent   = '🎯';
-        drawStatusEl.textContent = 'Keo chuot de ve san';
+        drawIndicator.className = 'ready';
+        drawIconEl.textContent = '🎯';
+        drawStatusEl.textContent = 'Nhấn giữ chuột và phím space để vẽ sàn';
     }
+});
+
+// ==== HỆ THỐNG QUẢN LÝ SỰ KIỆN ====
+const EventManager = {
+    events: [],
+    currentIndex: -1,
+    activeEvent: null,
+
+    register(eventObj) {
+        this.events.push(eventObj);
+        console.log(`[EventManager] Đã đăng ký sự kiện: ${eventObj.name}`);
+    },
+
+    startNext() {
+        this.currentIndex++;
+        if (this.currentIndex < this.events.length) {
+            this.activeEvent = this.events[this.currentIndex];
+            console.log(`[EventManager] Bắt đầu sự kiện: ${this.activeEvent.name}`);
+            if (this.activeEvent.init) this.activeEvent.init();
+        } else {
+            this.activeEvent = null;
+            // console.log("[EventManager] Tất cả sự kiện đã hoàn thành.");
+        }
+    },
+
+    onEventFinished(eventObj) {
+        if (this.activeEvent === eventObj) {
+            console.log(`[EventManager] Sự kiện kết thúc: ${eventObj.name}`);
+            this.startNext();
+        }
+    },
+
+    update() {
+        if (this.activeEvent && this.activeEvent.update) {
+            return this.activeEvent.update(); // Trả về true nếu sự kiện đang chiếm quyền điều khiển
+        }
+        return false;
+    }
+};
+
+// Khởi chạy sau khi tất cả script đã load
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        EventManager.startNext();
+    }, 1000); // Đợi 1 chút để đảm bảo mọi thứ đã sẵn sàng
 });
 
 // ==== QUYẾT ĐỊNH HÀNH VI TỰ ĐỘNG ====
@@ -906,11 +395,16 @@ function updateAutonomousBehavior() {
         return;
     }
 
+    // Kiểm tra xem có sự kiện nào đang chiếm quyền điều khiển không
+    if (EventManager.update()) {
+        return;
+    }
+
     if (Date.now() < slime.stateTimer) return;
 
     // Chọn hành vi tiếp theo dựa trên xác suất
     const rand = Math.random();
-    
+
     if (slime.state === 'HIDING' || slime.state === 'PEEKING') {
         // Nếu đang nấp thì nhảy lên lại sau khi xong
         slime.state = 'WANDERING';
@@ -968,7 +462,7 @@ slimeEl.addEventListener('pointermove', (e) => {
     slime.x = e.clientX - slime.w / 2;
     slime.y = e.clientY - slime.h / 2;
     slimeEl.style.left = slime.x + 'px';
-    slimeEl.style.top  = slime.y + 'px';
+    slimeEl.style.top = slime.y + 'px';
 });
 
 slimeEl.addEventListener('pointerup', (e) => {
@@ -994,15 +488,15 @@ window.addEventListener('mousemove', (e) => {
     if (!isDrawingBox) return;
     let w = e.clientX - startX;
     let h = e.clientY - startY;
-    drawBoxDiv.style.width  = Math.abs(w) + 'px';
+    drawBoxDiv.style.width = Math.abs(w) + 'px';
     drawBoxDiv.style.height = Math.abs(h) + 'px';
-    drawBoxDiv.style.left   = (w < 0 ? e.clientX : startX) + 'px';
-    drawBoxDiv.style.top    = (h < 0 ? e.clientY : startY) + 'px';
+    drawBoxDiv.style.left = (w < 0 ? e.clientX : startX) + 'px';
+    drawBoxDiv.style.top = (h < 0 ? e.clientY : startY) + 'px';
 });
 
 // Hiệu ứng thả tim
 function spawnHearts() {
-    const heartPool = ['❤️','💖','💗','💓','💕','🧡','💛','💚','💙','💜'];
+    const heartPool = ['❤️', '💖', '💗', '💓', '💕', '🧡', '💛', '💚', '💙', '💜'];
     const count = 4 + Math.floor(Math.random() * 3); // 4-6 trái tim
     for (let i = 0; i < count; i++) {
         const el = document.createElement('div');
@@ -1011,12 +505,12 @@ function spawnHearts() {
         // Vị trí: phân tán quanh đỉnh đầu bé sui
         const spawnX = slime.x + slime.w * (0.2 + Math.random() * 0.6);
         const spawnY = slime.y + slime.h * 0.2;
-        el.style.left    = spawnX + 'px';
-        el.style.top     = spawnY + 'px';
+        el.style.left = spawnX + 'px';
+        el.style.top = spawnY + 'px';
         el.style.fontSize = (13 + Math.random() * 11) + 'px';
         // Drift ngang ngẫu nhiên qua CSS custom property
         el.style.setProperty('--drift', ((Math.random() - 0.5) * 50) + 'px');
-        el.style.animationDelay    = (Math.random() * 0.25) + 's';
+        el.style.animationDelay = (Math.random() * 0.25) + 's';
         el.style.animationDuration = (0.9 + Math.random() * 0.4) + 's';
         document.body.appendChild(el);
         el.addEventListener('animationend', () => el.remove(), { once: true });
@@ -1056,8 +550,8 @@ slimeEl.addEventListener('contextmenu', (e) => {
 
 function gameLoop() {
     requestAnimationFrame(gameLoop);
-    if (slime.isDragging) return; 
-    
+    if (slime.isDragging) return;
+
     // OFFSET_BOTTOM tự động phát hiện từ pixel trong suốt phía dưới PNG
 
     updateAutonomousBehavior();
@@ -1076,10 +570,10 @@ function gameLoop() {
         nextY = currentFloorY - slime.h + OFFSET_BOTTOM;
         // Chỉ squish nếu rơi với vận tốc đủ mạnh
         if (slime.vy > 2) triggerLandSquish();
-        slime.vy = -slime.vy * 0.7; 
-        if(Math.abs(slime.vy) < 1) slime.vy = 0; 
+        slime.vy = -slime.vy * 0.7;
+        if (Math.abs(slime.vy) < 1) slime.vy = 0;
     }
-    
+
     if (nextX <= 0) {
         nextX = 0;
         slime.vx = -Math.abs(slime.vx) * 0.8;
@@ -1088,14 +582,14 @@ function gameLoop() {
         slime.vx = -Math.abs(slime.vx) * 0.8;
     }
 
-    for(let p of platforms) {
+    for (let p of platforms) {
         let isFalling = slime.vy > 0;
-        let wasAbove = (slime.y + slime.h - OFFSET_BOTTOM) <= p.y + 10; 
+        let wasAbove = (slime.y + slime.h - OFFSET_BOTTOM) <= p.y + 10;
         let isIntersectingX = (nextX + slime.w > p.x) && (nextX < p.x + p.width);
-        
+
         if (isFalling && wasAbove && isIntersectingX && nextY + slime.h - OFFSET_BOTTOM >= p.y) {
             nextY = p.y - slime.h + OFFSET_BOTTOM;
-            
+
             // Nếu vừa rơi xuống và chạm bệ mờ
             if (slime.inAir) {
                 const emotes = ['?', '!', '?!', '...', '✨', '🐾'];
@@ -1104,8 +598,8 @@ function gameLoop() {
                 slime.inAir = false; // Đã chạm đất
             }
 
-            slime.vy = -slime.vy * 0.6; 
-            if(Math.abs(slime.vy) < 1.5) slime.vy = 0;
+            slime.vy = -slime.vy * 0.6;
+            if (Math.abs(slime.vy) < 1.5) slime.vy = 0;
         }
     }
 
@@ -1119,7 +613,7 @@ function gameLoop() {
 
     // update autonomous friction check using the already declared currentFloorY
     if (slime.vy === 0 && slime.y + slime.h - OFFSET_BOTTOM >= currentFloorY - 5) {
-        slime.vx = slime.vx * 0.98; 
+        slime.vx = slime.vx * 0.98;
     }
 
     slime.x = nextX;
@@ -1138,8 +632,11 @@ function gameLoop() {
 requestAnimationFrame(gameLoop);
 
 window.addEventListener('resize', () => {
-    workArea.width  = window.innerWidth;
+    workArea.width = window.innerWidth;
     workArea.height = window.innerHeight;
     // Cập nhật lại floorY khi resize (thiết bị có thể thay taskbar size)
     ipcRenderer.invoke('get-work-area-height').then(h => { if (h) floorY = h; });
 });
+
+// ==== HÀNH VI SỰ KIỆN SINH NHẬT MẸ TÔI ĐÃ ĐƯỢC CHUYỂN SANG birthday_event.js ====
+
