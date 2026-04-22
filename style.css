@@ -278,13 +278,32 @@ button:hover {
     height: auto;
     cursor: grab;
     z-index: 1000;
-    opacity: 0.7;
+    opacity: 0.5;
     /* Make the slime partially transparent */
 }
 
 #slime:active {
     cursor: grabbing;
 }
+
+/* ===== SUI AURA GLOW ===== */
+@keyframes auraPulse {
+    0%, 100% {
+        filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6)) 
+                drop-shadow(0 0 15px rgba(100, 200, 255, 0.3)) 
+                drop-shadow(0 0 30px rgba(100, 200, 255, 0.1));
+    }
+    50% {
+        filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.9)) 
+                drop-shadow(0 0 25px rgba(100, 200, 255, 0.6)) 
+                drop-shadow(0 0 45px rgba(100, 200, 255, 0.2));
+    }
+}
+
+.sui-glow {
+    animation: auraPulse 2s infinite ease-in-out !important;
+}
+
 
 /* ===== DRAW MODE INDICATOR ===== */
 #drawIndicator {
@@ -813,12 +832,95 @@ button:hover {
     align-items: center;
 }
 
-#music-player select {
+/* Sort Pill Container */
+.sort-pill {
+    display: flex;
+    align-items: center;
     background: rgba(0, 0, 0, 0.3);
-    color: white;
     border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 4px;
-    padding: 4px;
+    border-radius: 20px;
+    padding: 0;
+}
+
+.sort-pill button {
+    background: transparent;
+    border: none;
+    color: white;
+    padding: 4px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 0;
+    backdrop-filter: none;
+    margin: 0;
+}
+
+.sort-pill button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+#sortActionBtn {
+    border-right: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 20px 0 0 20px;
+}
+
+.sort-dropdown {
+    position: relative;
+    display: flex;
+}
+
+#sortDropdownBtn {
+    border-radius: 0 20px 20px 0;
+    padding: 4px 10px;
+}
+
+.sort-dropdown-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 120%;
+    background-color: rgba(30, 30, 40, 0.95);
+    min-width: 160px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.6);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.sort-dropdown-content div {
+    color: white;
+    padding: 10px 15px;
+    text-decoration: none;
+    display: block;
+    cursor: pointer;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sort-dropdown-content div:last-child {
+    border-bottom: none;
+}
+
+.sort-dropdown-content div:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.sort-dropdown-content div.active {
+    background-color: rgba(100, 150, 255, 0.3);
+}
+
+.sort-dropdown-content.show {
+    display: block;
+}
+
+/* Drag Indicator cho việc kéo thả chèn giữa các file */
+.music-item.drag-over-top {
+    border-top: 2px solid #4A90E2;
+    margin-top: 2px;
+}
+.music-item.drag-over-bottom {
+    border-bottom: 2px solid #4A90E2;
+    margin-bottom: 2px;
 }
 
 .player-body {
@@ -834,6 +936,34 @@ button:hover {
     flex-direction: column;
     overflow: hidden;
 }
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.section-header h4 {
+    margin: 0;
+}
+
+.icon-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px;
+    border-radius: 4px;
+    transition: transform 0.2s, background 0.2s;
+}
+
+.icon-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: rotate(90deg);
+}
+
 
 .player-body .divider {
     flex: none;

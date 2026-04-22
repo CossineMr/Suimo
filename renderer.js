@@ -147,22 +147,41 @@ function isOverSlimeBody(offsetX, offsetY) {
 }
 
 const interactives = document.querySelectorAll('.interactive');
+let isSlimeHovered = false;
+
 function applyHoverLogic(el) {
     if (el === slimeEl) {
         // Pixel-perfect check cho bé Sui
         el.addEventListener('mousemove', (e) => {
             if (isDrawingMode || slime.isDragging) return;
             
+            // Dự phòng nếu hit data chưa kịp chuẩn bị
+            if (!slimePixelData && slimeEl.naturalWidth) {
+                prepareSlimeHitData();
+            }
+
             if (isOverSlimeBody(e.offsetX, e.offsetY)) {
-                ipcRenderer.send('set-ignore-mouse-events', false);
+                if (!isSlimeHovered) {
+                    isSlimeHovered = true;
+                    ipcRenderer.send('set-ignore-mouse-events', false);
+                    slimeEl.classList.add('sui-glow');
+                }
             } else {
-                ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
+                if (isSlimeHovered) {
+                    isSlimeHovered = false;
+                    ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
+                    slimeEl.classList.remove('sui-glow');
+                }
             }
         });
         
         el.addEventListener('mouseleave', () => {
-            if (!isDrawingMode && !slime.isDragging) {
-                ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
+            if (isSlimeHovered) {
+                isSlimeHovered = false;
+                if (!isDrawingMode && !slime.isDragging) {
+                    ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
+                }
+                slimeEl.classList.remove('sui-glow');
             }
         });
     } else {
@@ -320,22 +339,37 @@ const MusicPlayer = {
     async refreshLibrary() {
         this.library = await ipcRenderer.invoke('get-audio-files', 'music');
         this.originalLibrary = [...this.library];
-        this.applySortMode();
-    },
-
-    applySortMode() {
-        const sortSelect = document.getElementById('sortMode');
-        if (!sortSelect) return;
-        const mode = sortSelect.value;
-        if (mode === 'auto') {
-            this.library = [...this.originalLibrary].sort((a, b) => a.localeCompare(b));
-        } else if (mode === 'random') {
-            this.library = [...this.originalLibrary].sort(() => Math.random() - 0.5);
-        } else if (mode === 'manual') {
-            this.library = [...this.originalLibrary];
-        }
         this.renderLibrary();
     },
+
+    executeSort() {
+        const mode = this.currentSortMode || 'manual';
+        if (mode === 'default') {
+            AudioManager.playlist = [...this.originalLibrary];
+            this.renderPlaylist();
+        } else if (mode === 'random') {
+            AudioManager.playlist.sort(() => Math.random() - 0.5);
+            this.renderPlaylist();
+        } else if (mode === 'manual') {
+            // Giữ nguyên vị trí hiện tại
+            this.renderPlaylist();
+        }
+    },
+
+    getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.music-item')];
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    },
+
+    // Removed applySortMode
 
     renderLibrary() {
         const list = document.getElementById('library-list');
@@ -346,6 +380,7 @@ const MusicPlayer = {
             item.textContent = file;
             item.draggable = true;
             item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('source', 'library');
                 e.dataTransfer.setData('text/plain', file);
             });
             item.addEventListener('dblclick', () => {
@@ -368,6 +403,12 @@ const MusicPlayer = {
             const item = document.createElement('div');
             item.className = 'music-item';
             item.textContent = `${idx + 1}. ${file}`;
+            item.dataset.file = file;
+            item.draggable = true;
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('source', 'playlist');
+                e.dataTransfer.setData('idx', idx.toString());
+            });
             item.addEventListener('click', () => AudioManager.playMusic(idx));
             list.appendChild(item);
         });
@@ -388,18 +429,107 @@ const MusicPlayer = {
     setupEventListeners() {
         document.getElementById('closeMusicBtn').onclick = () => this.toggle();
         document.getElementById('playBtn').onclick = () => AudioManager.togglePlay();
+        document.getElementById('refreshLibraryBtn').onclick = () => this.refreshLibrary();
         
-        const sortSelect = document.getElementById('sortMode');
-        sortSelect.onchange = () => {
-            this.applySortMode();
+        const sortActionBtn = document.getElementById('sortActionBtn');
+        const sortDropdownBtn = document.getElementById('sortDropdownBtn');
+        const sortDropdownMenu = document.getElementById('sortDropdownMenu');
+        const modeItems = sortDropdownMenu.querySelectorAll('div');
+
+        this.currentSortMode = 'manual';
+
+        sortDropdownBtn.onclick = (e) => {
+            e.stopPropagation();
+            sortDropdownMenu.classList.toggle('show');
+        };
+
+        window.addEventListener('click', () => {
+            if (sortDropdownMenu.classList.contains('show')) {
+                sortDropdownMenu.classList.remove('show');
+            }
+        });
+
+        modeItems.forEach(item => {
+            item.onclick = (e) => {
+                e.stopPropagation();
+                this.currentSortMode = item.dataset.mode;
+                sortActionBtn.textContent = item.textContent;
+                
+                modeItems.forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                
+                sortDropdownMenu.classList.remove('show');
+            }
+        });
+
+        sortActionBtn.onclick = () => {
+            this.executeSort();
         };
 
         // Drag and Drop files
         const playlistList = document.getElementById('playlist-list');
-        playlistList.addEventListener('dragover', (e) => e.preventDefault());
+        playlistList.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const afterElement = this.getDragAfterElement(playlistList, e.clientY);
+            const items = playlistList.querySelectorAll('.music-item');
+            items.forEach(item => item.classList.remove('drag-over-top', 'drag-over-bottom'));
+            
+            if (afterElement) {
+                afterElement.classList.add('drag-over-top');
+            } else if (items.length > 0) {
+                items[items.length - 1].classList.add('drag-over-bottom');
+            }
+        });
+        
+        playlistList.addEventListener('dragleave', (e) => {
+            const items = playlistList.querySelectorAll('.music-item');
+            items.forEach(item => item.classList.remove('drag-over-top', 'drag-over-bottom'));
+        });
+
         playlistList.addEventListener('drop', (e) => {
-            const file = e.dataTransfer.getData('text/plain');
-            if (file) this.addToPlaylist(file);
+            e.preventDefault();
+            const items = playlistList.querySelectorAll('.music-item');
+            items.forEach(item => item.classList.remove('drag-over-top', 'drag-over-bottom'));
+
+            const source = e.dataTransfer.getData('source');
+            const afterElement = this.getDragAfterElement(playlistList, e.clientY);
+            
+            // Keep track of current playing song to preserve index
+            const currentPlayingSong = (AudioManager.currentIndex >= 0 && AudioManager.currentIndex < AudioManager.playlist.length) 
+                                        ? AudioManager.playlist[AudioManager.currentIndex] 
+                                        : null;
+
+            if (source === 'library') {
+                const file = e.dataTransfer.getData('text/plain');
+                if (!file) return;
+                
+                if (afterElement) {
+                    const insertIdx = AudioManager.playlist.indexOf(afterElement.dataset.file);
+                    AudioManager.playlist.splice(insertIdx, 0, file);
+                } else {
+                    AudioManager.playlist.push(file);
+                }
+            } else if (source === 'playlist') {
+                const dragIdx = parseInt(e.dataTransfer.getData('idx'), 10);
+                if (isNaN(dragIdx)) return;
+                
+                const file = AudioManager.playlist[dragIdx];
+                AudioManager.playlist.splice(dragIdx, 1);
+                
+                if (afterElement) {
+                    // Recalculate index after splice since the array mutated
+                    const insertIdx = AudioManager.playlist.indexOf(afterElement.dataset.file);
+                    AudioManager.playlist.splice(insertIdx, 0, file);
+                } else {
+                    AudioManager.playlist.push(file);
+                }
+            }
+            
+            if (currentPlayingSong) {
+                AudioManager.currentIndex = AudioManager.playlist.indexOf(currentPlayingSong);
+            }
+            
+            this.renderPlaylist();
         });
 
         // Di chuyen cua so

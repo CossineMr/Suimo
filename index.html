@@ -64,17 +64,26 @@
       <span class="header-title">Music Player 🎧</span>
       <div class="header-controls">
         <button id="playBtn" title="Phát/Tạm dừng">▶️</button>
-        <select id="sortMode" title="Chế độ sắp xếp">
-          <option value="manual">Tự sắp xếp</option>
-          <option value="auto">Sắp xếp tự động</option>
-          <option value="random">Sắp xếp ngẫu nhiên</option>
-        </select>
+        <div id="sortContainer" class="sort-pill">
+          <button id="sortActionBtn" title="Thực hiện sắp xếp danh sách phát">Tự sắp xếp</button>
+          <div class="sort-dropdown">
+            <button id="sortDropdownBtn" title="Chọn chế độ">▼</button>
+            <div id="sortDropdownMenu" class="sort-dropdown-content">
+              <div data-mode="manual" class="active">Tự sắp xếp</div>
+              <div data-mode="default">Sắp xếp mặc định</div>
+              <div data-mode="random">Sắp xếp ngẫu nhiên</div>
+            </div>
+          </div>
+        </div>
         <button id="closeMusicBtn">✖️</button>
       </div>
     </div>
     <div class="player-body">
       <div class="section">
-        <h4>Thư viện nhạc</h4>
+        <div class="section-header">
+          <h4>Thư viện nhạc</h4>
+          <button id="refreshLibraryBtn" title="Làm mới thư viện nhạc" class="icon-btn">🔄</button>
+        </div>
         <div id="library-list" class="music-list"></div>
       </div>
       <div class="section divider"></div>
