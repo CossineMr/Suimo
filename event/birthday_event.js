@@ -19,7 +19,14 @@ const BirthdayEvent = {
         
         this.exclamation = document.createElement('div');
         this.exclamation.className = 'exclamation-mark interactive';
-        this.exclamation.textContent = '!';
+        this.exclamation.innerHTML = `
+            <svg viewBox="0 0 60 100" width="100%" height="100%">
+                <!-- Thân dấu chấm than -->
+                <path d="M15 10 Q30 2 45 10 L40 60 Q30 70 20 60 Z" fill="#FFCC00" stroke="black" stroke-width="6" />
+                <!-- Dấu chấm -->
+                <circle cx="30" cy="85" r="10" fill="#FFCC00" stroke="black" stroke-width="6" />
+            </svg>
+        `;
         this.exclamation.title = 'Nhấp vào đây!';
         
         // Đảm bảo applyHoverLogic tồn tại (từ renderer.js)
@@ -106,8 +113,8 @@ const BirthdayEvent = {
     update() {
         // 1. Cập nhật vị trí dấu chấm than nếu đang hiện
         if (this.state === 'MARK_SHOWN' && this.exclamation) {
-            this.exclamation.style.left = (slime.x + slime.w / 2 - 10) + 'px';
-            this.exclamation.style.top = (slime.y - 40) + 'px';
+            this.exclamation.style.left = (slime.x + slime.w / 2 - 25) + 'px';
+            this.exclamation.style.top = (slime.y - 75) + 'px';
             return false; // Chưa chiếm quyền điều khiển Sui hoàn toàn
         }
 
