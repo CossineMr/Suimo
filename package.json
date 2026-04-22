@@ -15,7 +15,7 @@
       "target": [
         "portable"
       ],
-      "icon": "assets/Slime_Sui.svg"
+      "icon": "assets/Slime_Sui.ico"
     },
     "files": [
       "**/*",
@@ -25,12 +25,10 @@
       "output": "dist"
     }
   },
-  "dependencies": {
-    "electron": "^29.0.0"
-  },
+  "author": "CossineMr",
+  "dependencies": {},
   "devDependencies": {
-    "@tauri-apps/api": "^2.10.1",
-    "@tauri-apps/cli": "^2.10.1",
+    "electron": "^29.0.0",
     "electron-builder": "^24.13.3"
   }
 }

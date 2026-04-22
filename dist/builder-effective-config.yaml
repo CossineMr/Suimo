@@ -1,0 +1,14 @@
+directories:
+  output: dist
+  buildResources: build
+appId: com.cossinemr.suimo
+productName: Suimo
+win:
+  target:
+    - portable
+  icon: assets/Slime_Sui.ico
+files:
+  - filter:
+      - '**/*'
+      - assets/**/*
+electronVersion: 29.4.6
