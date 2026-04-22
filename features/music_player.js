@@ -1,28 +1,51 @@
-// ==== AM THANH & NHAC (AUDIO MANAGER) ====
 const AudioManager = {
     sfx: {},
+    preloadedSFX: {}, // Stores AudioBuffers
+    preloadedMusic: {}, // Stores Blob URLs
     music: new Audio(),
     isPlayingMusic: false,
     playlist: [],
     currentIndex: -1,
+    audioContext: null,
 
     init() {
         this.music.onended = () => this.playNext();
         this.fadeIntervals = {};
+        
+        // Initialize AudioContext on first interaction or init
+        try {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {
+            console.error('[AudioManager] Khong the khoi tao AudioContext:', e);
+        }
+        
         console.log('[AudioManager] Da khoi tao.');
     },
 
     playSFX(name, loop = false, fadeIn = false) {
         if (!loop) {
-            // Khong loop (VD: Sét) -> Tao instance moi de cho phep trung am thanh (overlap)
+            // Sử dụng Web Audio API cho SFX không loop (cực nhanh)
+            if (this.preloadedSFX[name] && this.audioContext) {
+                if (this.audioContext.state === 'suspended') {
+                    this.audioContext.resume();
+                }
+                const source = this.audioContext.createBufferSource();
+                source.buffer = this.preloadedSFX[name];
+                source.connect(this.audioContext.destination);
+                source.start(0);
+                return;
+            }
+            
+            // Dự phòng nếu chưa preload hoặc AudioContext lỗi
             const audio = new Audio(`assets/audio/sfx/${name}.mp3`);
             audio.play().catch(e => console.warn(`[SFX] Khong the phat ${name}:`, e));
             return;
         }
 
-        // Loop (VD: Mưa, Chim) -> Luu vao sfx de co the stop hoac fade
+        // Loop (VD: Mưa, Chim) -> Luu vao sfx để co the stop hoac fade
         if (!this.sfx[name]) {
-            this.sfx[name] = new Audio(`assets/audio/sfx/${name}.mp3`);
+            const url = `assets/audio/sfx/${name}.mp3`;
+            this.sfx[name] = new Audio(url);
         }
         this.sfx[name].loop = loop;
 
@@ -118,6 +141,50 @@ const AudioManager = {
             if (idx === this.currentIndex) el.classList.add('playing');
             else el.classList.remove('playing');
         });
+    },
+
+    // ==== PHƯƠNG THỨC TẢI TRƯỚC (PRELOAD) ====
+    async preloadSFX(names) {
+        for (const name of names) {
+            if (!this.preloadedSFX[name]) {
+                try {
+                    const response = await fetch(`assets/audio/sfx/${name}.mp3`);
+                    const arrayBuffer = await response.arrayBuffer();
+                    const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+                    this.preloadedSFX[name] = audioBuffer;
+                    console.log(`[AudioManager] Đã nạp SFX vào bộ nhớ: ${name}`);
+                } catch (e) {
+                    console.error(`[AudioManager] Lỗi nạp SFX ${name}:`, e);
+                }
+            }
+        }
+    },
+
+    async preloadMusic(name, path) {
+        if (!this.preloadedMusic[name]) {
+            try {
+                // Tải file dưới dạng Blob và tạo URL để cache mạnh hơn
+                const response = await fetch(path);
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                this.preloadedMusic[name] = url;
+                console.log(`[AudioManager] Đã nạp nhạc vào bộ nhớ: ${name}`);
+            } catch (e) {
+                console.error(`[AudioManager] Lỗi nạp nhạc ${name}:`, e);
+            }
+        }
+    },
+
+    playPreloadedMusic(name) {
+        if (this.preloadedMusic[name]) {
+            const audio = new Audio();
+            audio.src = this.preloadedMusic[name];
+            audio.play().catch(e => console.error(`[Music] Không thể phát nhạc preload ${name}:`, e));
+            return audio;
+        } else {
+            console.warn(`[Music] Nhạc preload ${name} không tồn tại.`);
+            return null;
+        }
     }
 };
 AudioManager.init();

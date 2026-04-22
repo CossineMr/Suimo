@@ -382,11 +382,28 @@ const EventManager = {
 };
 
 // Khởi chạy sau khi tất cả script đã load
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+    // Tải trước các âm thanh VFX/SFX
+    if (typeof AudioManager !== 'undefined') {
+        // Tải SFX quan trọng trước
+        await AudioManager.preloadSFX(['Squish', 'Lightning', 'Rain', 'CardboardBoxDrop']);
+        // Tải nhạc nền sự kiện sau
+        AudioManager.preloadMusic('birthday_song', 'assets/audio/music/Happy Birthday To You.mp3');
+    }
+
     setTimeout(() => {
         EventManager.startNext();
     }, 1000); // Đợi 1 chút để đảm bảo mọi thứ đã sẵn sàng
 });
+
+// Đảm bảo AudioContext được resume ngay khi người dùng tương tác lần đầu
+window.addEventListener('mousedown', () => {
+    if (typeof AudioManager !== 'undefined' && AudioManager.audioContext) {
+        if (AudioManager.audioContext.state === 'suspended') {
+            AudioManager.audioContext.resume();
+        }
+    }
+}, { once: true });
 
 // ==== QUYẾT ĐỊNH HÀNH VI TỰ ĐỘNG ====
 function updateAutonomousBehavior() {
