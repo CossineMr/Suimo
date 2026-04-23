@@ -57,17 +57,36 @@ let slime = {
     state: 'IDLE', // IDLE, WANDERING, HIDING, PEEKING
     stateTimer: Date.now() + 2000,
     facingRight: true,
-    behaviorFloorY: null // Sẽ dùng floorY mặc định
+    behaviorFloorY: null, // Sẽ dùng floorY mặc định
+    // Climbing AI data
+    climbTarget: null,
+    climbAttempts: 0,
+    climbGiveUpUntil: 0,
+    isPreparingJump: false
 };
 
-function spawnEmote(text) {
+function spawnEmote(text, follow = false) {
     const el = document.createElement('div');
     el.className = 'emote-popup';
     el.textContent = text;
-    el.style.left = (slime.x + slime.w / 2 - 10) + 'px';
-    el.style.top = (slime.y + 55) + 'px'; // Hạ thấp vị trí hơn nữa
     document.body.appendChild(el);
-    el.addEventListener('animationend', () => el.remove(), { once: true });
+    
+    const updatePos = () => {
+        el.style.left = (slime.x + slime.w / 2 - 12) + 'px';
+        el.style.top = (slime.y - 25) + 'px'; 
+    };
+    
+    updatePos();
+    
+    if (follow) {
+        const interval = setInterval(updatePos, 16);
+        el.addEventListener('animationend', () => {
+            clearInterval(interval);
+            el.remove();
+        }, { once: true });
+    } else {
+        el.addEventListener('animationend', () => el.remove(), { once: true });
+    }
 }
 
 function triggerLandSquish() {
@@ -210,22 +229,29 @@ let isSpaceHeld = false;
 window.addEventListener('keydown', (e) => {
     if (isDrawingMode) return; // Khong bat khi dang ve
     const key = e.key.toLowerCase();
-    if (key === 'm') MusicPlayer.toggle();
+    if (key === 'm') SuiManager.toggle();
 
-    if (e.code !== 'Space' || isSpaceHeld || e.repeat) return;
-    e.preventDefault();
-    isSpaceHeld = true;
-    isDrawingMode = true;
-    ipcRenderer.send('set-ignore-mouse-events', false);
-    // Hien lai cac platform, xoa timer cu
-    platforms.forEach(p => {
-        if (p.timer) { clearTimeout(p.timer); p.timer = null; }
-        p.el.classList.remove('hidden');
-    });
-    // Indicator -> san sang
-    drawIndicator.className = 'ready';
-    drawIconEl.textContent = '🎯';
-    drawStatusEl.textContent = 'Keo chuot de ve san';
+    if (e.code === 'Space') {
+        if (!isSpaceHeld) {
+            isSpaceHeld = true;
+            isDrawingMode = true;
+            ipcRenderer.send('set-ignore-mouse-events', false);
+            // Emote tò mò khi bắt đầu chế độ vẽ (chỉ hiện 1 lần)
+            spawnEmote('🧐', true);
+            
+            // Hien lai cac platform, xoa timer cu
+            platforms.forEach(p => {
+                if (p.timer) { clearTimeout(p.timer); p.timer = null; }
+                p.el.classList.remove('hidden');
+            });
+            // Indicator -> san sang
+            drawIndicator.className = 'ready';
+            drawIconEl.textContent = '🎯';
+            drawStatusEl.textContent = 'Keo chuot de ve san';
+        }
+        e.preventDefault();
+        return;
+    }
 });
 
 window.addEventListener('keyup', (e) => {
@@ -256,14 +282,14 @@ window.addEventListener('keyup', (e) => {
     ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
     drawIndicator.className = '';
 
-    // An platform va bat dau dem nguoc 5s
+    // An platform va bat dau dem nguoc 10s
     platforms.forEach(p => {
         p.el.classList.add('hidden');
         if (p.timer) clearTimeout(p.timer);
         p.timer = setTimeout(() => {
             const index = platforms.indexOf(p);
             if (index !== -1) { p.el.remove(); platforms.splice(index, 1); }
-        }, 5000);
+        }, 10000);
     });
 });
 
@@ -407,7 +433,7 @@ window.addEventListener('mousedown', () => {
 
 // ==== QUYẾT ĐỊNH HÀNH VI TỰ ĐỘNG ====
 function updateAutonomousBehavior() {
-    if (slime.isDragging || isDrawingMode) {
+    if (slime.isDragging) {
         slime.state = 'IDLE';
         return;
     }
@@ -415,6 +441,289 @@ function updateAutonomousBehavior() {
     // Kiểm tra xem có sự kiện nào đang chiếm quyền điều khiển không
     if (EventManager.update()) {
         return;
+    }
+
+    // Chế độ leo bậc thang (CLIMBING) - Chỉ chạy khi KHÔNG ở chế độ vẽ
+    if (!isDrawingMode && platforms.length > 0 && Date.now() > slime.climbGiveUpUntil) {
+        if (!slime.climbMode) slime.climbMode = 'ASCENDING';
+        if (!slime.climbHistory) slime.climbHistory = [];
+
+        // Hỗ trợ mục tiêu giả (mặt đất)
+        let hasValidTarget = slime.climbTarget && (platforms.includes(slime.climbTarget) || slime.climbTarget.isFloorMock);
+
+        // Tìm bậc thang mục tiêu nếu chưa có hoặc mục tiêu đã biến mất
+        if (!hasValidTarget) {
+            // Xác định xem đang ở trên sàn nhà hay trên bậc thang
+            let currentPlatform = platforms.find(p => 
+                slime.x + slime.w > p.x && slime.x < p.x + p.width && 
+                Math.abs(slime.y + slime.h - OFFSET_BOTTOM - p.y) < 30
+            );
+
+            if (!currentPlatform) {
+                // Đang ở dưới đất
+                if (slime.climbMode === 'DESCENDING') {
+                    // Xuống tới đất rồi! Hoàn thành hành trình.
+                    slime.climbMode = 'ASCENDING';
+                    slime.climbHistory = [];
+                    spawnEmote('🐾', true);
+                    slime.climbTarget = null;
+                    slime.climbGiveUpUntil = Date.now() + 5000;
+                } else {
+                    // Bắt đầu leo lên
+                    slime.climbMode = 'ASCENDING';
+                    slime.climbHistory = [];
+                    let lowest = platforms[0];
+                    platforms.forEach(p => { if (p.y > lowest.y) lowest = p; });
+                    slime.climbTarget = lowest;
+                    slime.climbAttempts = 0;
+                    slime.isRunningUp = false;
+                    spawnEmote('!', true);
+                }
+            } else {
+                // Đang ở trên một bậc thang
+                if (slime.climbMode === 'ASCENDING') {
+                    let closest = null;
+                    let minDist = 500;
+                    let isHighest = true;
+
+                    platforms.forEach(p => {
+                        if (p.y < currentPlatform.y - 10) isHighest = false;
+                        if (p === currentPlatform) return;
+                        if (p.y > currentPlatform.y + 10) return; // Chỉ tìm bậc cao hơn hoặc ngang bằng
+                        const dist = Math.abs((p.x + p.width / 2) - (currentPlatform.x + currentPlatform.width / 2));
+                        if (dist < minDist) {
+                            minDist = dist;
+                            closest = p;
+                        }
+                    });
+
+                    if (isHighest) {
+                        slime.climbMode = 'CELEBRATING';
+                        slime.celebrateTimer = Date.now() + 3000;
+                        spawnEmote('🥳', true);
+                        slime.climbTarget = null;
+                    } else if (closest) {
+                        slime.climbTarget = closest;
+                        slime.climbAttempts = 0;
+                        slime.isRunningUp = false;
+                        spawnEmote('💨', true);
+                    } else {
+                        slime.climbMode = 'CELEBRATING';
+                        slime.celebrateTimer = Date.now() + 3000;
+                        spawnEmote('🥳', true);
+                        slime.climbTarget = null;
+                    }
+                } else if (slime.climbMode === 'CELEBRATING') {
+                    if (Date.now() < slime.celebrateTimer) {
+                        if (!slime.inAir && Math.random() < 0.1) {
+                            slime.vy = -6 - Math.random() * 4;
+                            slime.vx = 0;
+                            slime.inAir = true;
+                            const emotes = ['🥳', '🎉', '✨', '🎵'];
+                            spawnEmote(emotes[Math.floor(Math.random() * emotes.length)], true);
+                        }
+                        return; // Bỏ qua phần tính toán leo trèo khi đang ăn mừng
+                    } else {
+                        slime.climbMode = 'DESCENDING';
+                        slime.climbTarget = null; // Kích hoạt vòng lặp tìm mục tiêu mới
+                    }
+                } else if (slime.climbMode === 'DESCENDING') {
+                    let prevPlatform = null;
+                    while (slime.climbHistory.length > 0) {
+                        prevPlatform = slime.climbHistory.pop();
+                        if (prevPlatform !== currentPlatform && platforms.includes(prevPlatform)) {
+                            break;
+                        } else {
+                            prevPlatform = null;
+                        }
+                    }
+
+                    if (prevPlatform) {
+                        slime.climbTarget = prevPlatform;
+                        slime.climbAttempts = 0;
+                        slime.isRunningUp = false;
+                        spawnEmote('⬇️', true);
+                    } else {
+                        // Mục tiêu giả: Mặt đất ngay bên dưới
+                        slime.climbTarget = {
+                            x: currentPlatform.x,
+                            y: currentFloorY,
+                            width: currentPlatform.width,
+                            isFloorMock: true
+                        };
+                        slime.climbAttempts = 0;
+                        slime.isRunningUp = false;
+                        spawnEmote('⬇️', true);
+                    }
+                }
+            }
+        }
+
+        if (slime.climbTarget && slime.climbMode !== 'CELEBRATING') {
+            slime.state = 'CLIMBING';
+            const target = slime.climbTarget;
+            const targetCenterX = target.x + target.width / 2;
+            const suiCenterX = slime.x + slime.w / 2;
+            const dist = targetCenterX - suiCenterX;
+
+            if (!slime.inAir) {
+                if (!slime.climbSubState) slime.climbSubState = 'EVALUATING';
+
+                let edgeLeft = -10000;
+                let edgeRight = 10000;
+                let currentPlatform = null;
+
+                // Xác định nền đang đứng
+                for (let p of platforms) {
+                    if (slime.x + slime.w > p.x && slime.x < p.x + p.width && 
+                        Math.abs(slime.y + slime.h - OFFSET_BOTTOM - p.y) < 5) {
+                        currentPlatform = p;
+                        edgeLeft = p.x + slime.w/2;
+                        edgeRight = p.x + p.width - slime.w/2;
+                        break;
+                    }
+                }
+
+                // Xác định mép bật nhảy (frontEdge) và giới hạn lùi (backEdge)
+                let frontEdge, backEdge;
+                if (currentPlatform) {
+                    if (targetCenterX >= edgeLeft && targetCenterX <= edgeRight) {
+                        frontEdge = targetCenterX; // Mục tiêu nằm ngay trên nền này
+                        backEdge = dist > 0 ? edgeLeft : edgeRight;
+                    } else {
+                        frontEdge = dist > 0 ? edgeRight : edgeLeft;
+                        backEdge = dist > 0 ? edgeLeft : edgeRight;
+                    }
+                } else {
+                    // Đứng dưới sàn
+                    frontEdge = targetCenterX - (dist > 0 ? 80 : -80);
+                    backEdge = dist > 0 ? frontEdge - 500 : frontEdge + 500;
+                }
+
+                let jumpDist_edge = Math.abs(targetCenterX - frontEdge);
+                let jumpDist_current = Math.abs(targetCenterX - suiCenterX);
+
+                // Tính toán đạn đạo (Projectile Physics)
+                let targetDeltaY = target.y - (slime.y + slime.h - OFFSET_BOTTOM);
+                let vy = -13.5; // Tăng nhẹ lực nhảy để bù cho trọng lực 0.6
+                if (targetDeltaY < -60) vy = -14.5;
+                if (targetDeltaY < -120) vy = -16.5;
+                if (targetDeltaY < -200) vy = -18.5;
+                vy = vy - (slime.climbAttempts * 1.0); 
+
+                // Thời gian bay T (với g=0.6, a=0.3, 2a=0.6)
+                let discriminant = vy * vy + targetDeltaY * 1.2; // targetDeltaY * 2 * g? No.
+                // a*t^2 + b*t + c = 0 => 0.3*t^2 + vy*t - targetDeltaY = 0
+                // discriminant = vy^2 - 4 * 0.3 * (-targetDeltaY) = vy^2 + 1.2 * targetDeltaY
+                let tInAir = discriminant >= 0 ? (-vy + Math.sqrt(discriminant)) / 0.6 : (-vy) / 0.6;
+
+                // ĐÁNH GIÁ TRẠNG THÁI (EVALUATING)
+                if (slime.climbSubState === 'EVALUATING') {
+                    let reqVx_current = jumpDist_current / tInAir;
+                    let reqVx_edge = jumpDist_edge / tInAir;
+                    
+                    if (reqVx_current <= 3.5) {
+                        // Vị trí hiện tại đã có thể nhảy tới (nhảy đứng)
+                        slime.climbSubState = 'JUMPING_CURRENT';
+                    } else if (reqVx_edge <= 3.5) {
+                        // Chạy tới mép là có thể nhảy đứng tới
+                        slime.climbSubState = 'MOVING_TO_EDGE';
+                    } else {
+                        // Vẫn quá xa, phải lùi lại để lấy đà nhảy từ mép
+                        slime.climbSubState = 'BACKING_UP';
+                        let neededRunningVx = reqVx_edge - 3.5; // Vận tốc cần bù đắp từ chạy lấy đà
+                        slime.reqRunup = neededRunningVx * 30; // 30px lùi cho mỗi đơn vị vận tốc thiếu
+                        
+                        slime.targetStartX = dist > 0 ? frontEdge - slime.reqRunup : frontEdge + slime.reqRunup;
+                        // Giới hạn điểm bắt đầu lấy đà không vượt quá mép sau của nền
+                        if (dist > 0 && slime.targetStartX < backEdge) slime.targetStartX = backEdge;
+                        if (dist < 0 && slime.targetStartX > backEdge) slime.targetStartX = backEdge;
+                    }
+                }
+
+                let shouldJump = false;
+                let actualVx = 0;
+                let jumpDirection = dist > 0 ? 1 : -1;
+
+                if (slime.climbSubState === 'JUMPING_CURRENT') {
+                    shouldJump = true;
+                    actualVx = jumpDist_current / tInAir;
+                    if (actualVx > 3.5) actualVx = 3.5;
+                } 
+                else if (slime.climbSubState === 'MOVING_TO_EDGE') {
+                    let distToFront = frontEdge - suiCenterX;
+                    if (Math.abs(distToFront) > 10) {
+                        slime.facingRight = distToFront > 0;
+                        slime.vx = (slime.facingRight ? 1 : -1) * 3; // Đi bộ tới mép
+                    } else {
+                        shouldJump = true;
+                        actualVx = Math.abs(targetCenterX - suiCenterX) / tInAir;
+                        if (actualVx > 3.5) actualVx = 3.5;
+                        jumpDirection = targetCenterX > suiCenterX ? 1 : -1;
+                    }
+                }
+                else if (slime.climbSubState === 'BACKING_UP') {
+                    let distToStart = slime.targetStartX - suiCenterX;
+                    if (Math.abs(distToStart) > 10) {
+                        slime.facingRight = distToStart > 0;
+                        slime.vx = (slime.facingRight ? 1 : -1) * 2; // Đi bộ lùi lại
+                    } else {
+                        slime.climbSubState = 'RUNNING_UP';
+                    }
+                }
+                else if (slime.climbSubState === 'RUNNING_UP') {
+                    let distToFront = frontEdge - suiCenterX;
+                    if (Math.abs(distToFront) > 10) {
+                        slime.facingRight = distToFront > 0;
+                        slime.vx = (slime.facingRight ? 1 : -1) * 5; // Chạy nhanh lấy đà
+                        if (Math.random() < 0.1) spawnEmote('💨', true);
+                    } else {
+                        shouldJump = true;
+                        // Tính lực bật thực tế dựa trên quãng đường lùi khả dụng
+                        let actualRunup = Math.abs(frontEdge - slime.targetStartX);
+                        let reqVx_edge = jumpDist_edge / tInAir;
+                        actualVx = 3.5 + (actualRunup / 30);
+                        if (actualVx > reqVx_edge) actualVx = reqVx_edge; // Tránh bay lố
+                        jumpDirection = targetCenterX > frontEdge ? 1 : -1;
+                    }
+                }
+
+                if (shouldJump) {
+                    if (!slime.isPreparingJump) {
+                        slime.isPreparingJump = true;
+                        slime.vx = 0;
+                        setTimeout(() => {
+                            if (slime.climbTarget === target) {
+                                spawnEmote('💦', true);
+                                
+                                if (actualVx < 1.5 && Math.abs(targetCenterX - suiCenterX) >= 10) actualVx = 1.5;
+                                if (Math.abs(targetCenterX - suiCenterX) < 10) actualVx = 0; // Nhảy thẳng đứng
+                                
+                                slime.vy = vy;
+                                slime.vx = jumpDirection * actualVx;
+                                slime.inAir = true; 
+                                slime.climbSubState = 'EVALUATING'; // Reset trạng thái cho lần tính toán sau
+                            }
+                            slime.isPreparingJump = false;
+                        }, 150);
+                    }
+                }
+            } else {
+                // Đang nhảy, nếu rơi xuống quá sâu thì tính là trượt
+                if (slime.vy > 0 && slime.y > target.y + 100) {
+                    slime.climbAttempts++;
+                    if (slime.climbAttempts >= 3) {
+                        spawnEmote('😞', true);
+                        slime.climbTarget = null;
+                        slime.climbGiveUpUntil = Date.now() + 10000;
+                    }
+                }
+            }
+
+            if (slime.facingRight) slimeEl.classList.remove('flipped');
+            else slimeEl.classList.add('flipped');
+            return;
+        }
     }
 
     if (Date.now() < slime.stateTimer) return;
@@ -573,7 +882,7 @@ function gameLoop() {
 
     updateAutonomousBehavior();
 
-    slime.vy += 0.5; // Trọng lực
+    slime.vy += 0.6; // Trọng lực tăng lên 0.6 để cảm giác nặng và thật hơn
     let nextX = slime.x + slime.vx;
     let nextY = slime.y + slime.vy;
 
@@ -602,7 +911,11 @@ function gameLoop() {
     for (let p of platforms) {
         let isFalling = slime.vy > 0;
         let wasAbove = (slime.y + slime.h - OFFSET_BOTTOM) <= p.y + 10;
-        let isIntersectingX = (nextX + slime.w > p.x) && (nextX < p.x + p.width);
+        
+        // Thu hẹp vùng tiếp xúc chân (chỉ lấy 30% ở giữa chiều rộng nhân vật)
+        let footWidth = slime.w * 0.3;
+        let footX = nextX + (slime.w - footWidth) / 2;
+        let isIntersectingX = (footX + footWidth > p.x) && (footX < p.x + p.width);
 
         if (isFalling && wasAbove && isIntersectingX && nextY + slime.h - OFFSET_BOTTOM >= p.y) {
             nextY = p.y - slime.h + OFFSET_BOTTOM;
@@ -610,27 +923,51 @@ function gameLoop() {
             // Nếu vừa rơi xuống và chạm bệ mờ
             if (slime.inAir) {
                 const emotes = ['?', '!', '?!', '...', '✨', '🐾'];
-                spawnEmote(emotes[Math.floor(Math.random() * emotes.length)]);
+                // Giảm tỷ lệ hiện emote khi đáp để tránh spam (chỉ hiện 30% số lần chạm)
+                if (Math.random() < 0.3) {
+                    spawnEmote(emotes[Math.floor(Math.random() * emotes.length)]);
+                }
                 triggerLandSquish();
                 slime.inAir = false; // Đã chạm đất
+                slime.climbSubState = 'EVALUATING'; // Reset tính toán AI
+                
+                if (slime.climbTarget === p) {
+                    slime.climbTarget = null; // Đã tới đích, reset mục tiêu để tìm mục tiêu mới
+                    if (slime.climbMode === 'ASCENDING') {
+                        if (!slime.climbHistory) slime.climbHistory = [];
+                        if (slime.climbHistory[slime.climbHistory.length - 1] !== p) {
+                            slime.climbHistory.push(p);
+                        }
+                    }
+                }
             }
 
-            slime.vy = -slime.vy * 0.6;
-            if (Math.abs(slime.vy) < 1.5) slime.vy = 0;
+            slime.vy = -slime.vy * 0.1; // Giảm độ nẩy xuống tối thiểu (10%)
+            if (Math.abs(slime.vy) < 2.0) slime.vy = 0; // Triệt tiêu lực nẩy nhanh hơn
         }
     }
 
     // Nếu không chạm bệ but chạm sàn
     if (nextY + slime.h - OFFSET_BOTTOM >= floorY - 2) {
+        if (slime.inAir) {
+            slime.climbSubState = 'EVALUATING'; // Reset tính toán AI
+            slime.climbTarget = null; // Chạm sàn thì xoá mục tiêu cũ (nếu có)
+        }
         slime.inAir = false;
-    } else if (slime.vy > 1 || slime.isDragging) {
-        // Nếu đang rơi hoặc đang bị kéo thì tính là đang ở trên không
+    } else if (Math.abs(slime.vy) > 1 || slime.isDragging) {
+        // Nếu đang rơi, nhảy lên hoặc đang bị kéo thì tính là đang ở trên không
         slime.inAir = true;
     }
 
-    // update autonomous friction check using the already declared currentFloorY
-    if (slime.vy === 0 && slime.y + slime.h - OFFSET_BOTTOM >= currentFloorY - 5) {
-        slime.vx = slime.vx * 0.98;
+    // update autonomous friction check
+    if (!slime.inAir) {
+        if (slime.y + slime.h - OFFSET_BOTTOM >= currentFloorY - 5) {
+            slime.vx = slime.vx * 0.95; // Ma sát trên sàn
+        } else {
+            // Ma sát cực mạnh trên bậc thang để tránh trượt (gần như dừng lập tức)
+            slime.vx = slime.vx * 0.1;
+            if (Math.abs(slime.vx) < 0.1) slime.vx = 0;
+        }
     }
 
     slime.x = nextX;

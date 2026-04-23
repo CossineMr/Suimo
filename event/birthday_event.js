@@ -7,10 +7,7 @@ const BirthdayEvent = {
     exclamation: null,
 
     init() {
-        console.log("[BirthdayEvent] Đã khởi chạy. Đang chờ 10s để hiện dấu chấm than...");
-        setTimeout(() => {
-            this.showExclamation();
-        }, 10000);
+        console.log("[BirthdayEvent] Đã khởi chạy. Đang chờ kích hoạt từ Menu Quản lý...");
     },
 
     showExclamation() {

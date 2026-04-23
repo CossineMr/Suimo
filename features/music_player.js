@@ -189,18 +189,25 @@ const AudioManager = {
 };
 AudioManager.init();
 
-// ==== TRINH PHAT NHAC (MUSIC PLAYER UI) ====
-const MusicPlayer = {
+// ==== QUẢN LÝ CỬA SỔ CHUNG (SUI MANAGER) ====
+const SuiManager = {
     library: [],
     el: null,
     isOpen: false,
+    activeTabId: 'music', // Mặc định là tab nhạc
     isDraggingWindow: false,
     dragOffset: { x: 0, y: 0 },
 
     init() {
-        this.el = document.getElementById('music-player');
+        this.el = document.getElementById('sui-manager');
         this.setupEventListeners();
         this.refreshLibrary();
+        
+        // Tải lại tab cuối cùng nếu có lưu
+        const lastTab = localStorage.getItem('sui_last_tab');
+        if (lastTab) {
+            this.switchTab(lastTab);
+        }
     },
 
     async refreshLibrary() {
@@ -208,6 +215,28 @@ const MusicPlayer = {
         this.library = await ipcRenderer.invoke('get-audio-files', 'music');
         this.originalLibrary = [...this.library];
         this.renderLibrary();
+    },
+
+    switchTab(tabId) {
+        this.activeTabId = tabId;
+        localStorage.setItem('sui_last_tab', tabId);
+
+        // Cập nhật giao diện tab
+        document.querySelectorAll('.tab').forEach(tab => {
+            if (tab.dataset.tab === tabId) tab.classList.add('active');
+            else tab.classList.remove('active');
+        });
+
+        // Cập nhật panel hiển thị
+        document.querySelectorAll('.tab-pane').forEach(pane => {
+            if (pane.id === `tab-${tabId}`) pane.classList.add('active');
+            else pane.classList.remove('active');
+        });
+
+        // Nếu chuyển sang tab sự kiện, hãy cập nhật danh sách
+        if (tabId === 'events' && typeof EventManagerUI !== 'undefined') {
+            EventManagerUI.render();
+        }
     },
 
     executeSort() {
@@ -219,7 +248,6 @@ const MusicPlayer = {
             AudioManager.playlist.sort(() => Math.random() - 0.5);
             this.renderPlaylist();
         } else if (mode === 'manual') {
-            // Giữ nguyên vị trí hiện tại
             this.renderPlaylist();
         }
     },
@@ -239,6 +267,7 @@ const MusicPlayer = {
 
     renderLibrary() {
         const list = document.getElementById('library-list');
+        if (!list) return;
         list.innerHTML = '';
         this.library.forEach(file => {
             const item = document.createElement('div');
@@ -250,7 +279,6 @@ const MusicPlayer = {
                 e.dataTransfer.setData('text/plain', file);
             });
             item.addEventListener('dblclick', () => {
-                // Double click de them vao playlist
                 this.addToPlaylist(file);
             });
             list.appendChild(item);
@@ -264,6 +292,7 @@ const MusicPlayer = {
 
     renderPlaylist() {
         const list = document.getElementById('playlist-list');
+        if (!list) return;
         list.innerHTML = '';
         AudioManager.playlist.forEach((file, idx) => {
             const item = document.createElement('div');
@@ -287,6 +316,10 @@ const MusicPlayer = {
         if (this.isOpen) {
             this.el.classList.add('show');
             ipcRenderer.send('set-ignore-mouse-events', false);
+            // Khi mở ra, nếu là tab sự kiện thì render lại cho chắc
+            if (this.activeTabId === 'events' && typeof EventManagerUI !== 'undefined') {
+                EventManagerUI.render();
+            }
         } else {
             this.el.classList.remove('show');
             if (typeof isDrawingMode !== 'undefined' && typeof slime !== 'undefined') {
@@ -299,7 +332,16 @@ const MusicPlayer = {
 
     setupEventListeners() {
         const { ipcRenderer } = require('electron');
-        document.getElementById('closeMusicBtn').onclick = () => this.toggle();
+        
+        // Đóng cửa sổ
+        document.getElementById('closeManagerBtn').onclick = () => this.toggle();
+        
+        // Chuyển Tab
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.onclick = () => this.switchTab(tab.dataset.tab);
+        });
+
+        // Controls nhạc
         document.getElementById('playBtn').onclick = () => AudioManager.togglePlay();
         document.getElementById('refreshLibraryBtn').onclick = () => this.refreshLibrary();
 
@@ -366,7 +408,6 @@ const MusicPlayer = {
             const source = e.dataTransfer.getData('source');
             const afterElement = this.getDragAfterElement(playlistList, e.clientY);
 
-            // Keep track of current playing song to preserve index
             const currentPlayingSong = (AudioManager.currentIndex >= 0 && AudioManager.currentIndex < AudioManager.playlist.length)
                 ? AudioManager.playlist[AudioManager.currentIndex]
                 : null;
@@ -389,7 +430,6 @@ const MusicPlayer = {
                 AudioManager.playlist.splice(dragIdx, 1);
 
                 if (afterElement) {
-                    // Recalculate index after splice since the array mutated
                     const insertIdx = AudioManager.playlist.indexOf(afterElement.dataset.file);
                     AudioManager.playlist.splice(insertIdx, 0, file);
                 } else {
@@ -404,9 +444,10 @@ const MusicPlayer = {
             this.renderPlaylist();
         });
 
-        // Di chuyen cua so
-        const header = this.el.querySelector('.player-header');
+        // Di chuyển cửa sổ
+        const header = this.el.querySelector('.window-header');
         header.onmousedown = (e) => {
+            if (e.target.closest('.header-controls') || e.target.closest('.tab')) return;
             this.isDraggingWindow = true;
             this.dragOffset.x = e.clientX - this.el.offsetLeft;
             this.dragOffset.y = e.clientY - this.el.offsetTop;
@@ -417,7 +458,7 @@ const MusicPlayer = {
             if (!this.isDraggingWindow) return;
             this.el.style.left = (e.clientX - this.dragOffset.x) + 'px';
             this.el.style.top = (e.clientY - this.dragOffset.y) + 'px';
-            this.el.style.transform = 'none'; // Huy transform translate(-50%, -50%) khi keo
+            this.el.style.transform = 'none';
         });
 
         window.addEventListener('mouseup', () => {
@@ -426,5 +467,5 @@ const MusicPlayer = {
         });
     }
 };
-document.addEventListener('DOMContentLoaded', () => MusicPlayer.init());
+document.addEventListener('DOMContentLoaded', () => SuiManager.init());
 

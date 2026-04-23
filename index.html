@@ -58,44 +58,70 @@
   <!-- Bé Sui -->
   <img id="slime" class="interactive" src="assets/Slime_Sui.svg" alt="Slime">
 
-  <!-- Trình phát nhạc -->
-  <div id="music-player" class="interactive">
-    <div class="player-header">
-      <span class="header-title">Music Player 🎧</span>
+  <!-- Cửa sổ quản lý (Nhạc & Sự kiện) -->
+  <div id="sui-manager" class="interactive">
+    <div class="window-header">
+      <div class="tab-container">
+        <div class="tab active" data-tab="music">Âm nhạc 🎵</div>
+        <div class="tab" data-tab="events">Sự kiện 📅</div>
+      </div>
       <div class="header-controls">
-        <button id="playBtn" title="Phát/Tạm dừng">▶️</button>
-        <div id="sortContainer" class="sort-pill">
-          <button id="sortActionBtn" title="Thực hiện sắp xếp danh sách phát">Tự sắp xếp</button>
-          <div class="sort-dropdown">
-            <button id="sortDropdownBtn" title="Chọn chế độ">▼</button>
-            <div id="sortDropdownMenu" class="sort-dropdown-content">
-              <div data-mode="manual" class="active">Tự sắp xếp</div>
-              <div data-mode="default">Sắp xếp mặc định</div>
-              <div data-mode="random">Sắp xếp ngẫu nhiên</div>
+        <button id="closeManagerBtn" title="Đóng">✖️</button>
+      </div>
+    </div>
+    
+    <div class="window-body">
+      <!-- Tab Âm nhạc -->
+      <div id="tab-music" class="tab-pane active">
+        <div class="pane-header">
+          <div class="music-controls-top">
+            <button id="playBtn" title="Phát/Tạm dừng">▶️</button>
+            <div id="sortContainer" class="sort-pill">
+              <button id="sortActionBtn" title="Thực hiện sắp xếp danh sách phát">Tự sắp xếp</button>
+              <div class="sort-dropdown">
+                <button id="sortDropdownBtn" title="Chọn chế độ">▼</button>
+                <div id="sortDropdownMenu" class="sort-dropdown-content">
+                  <div data-mode="manual" class="active">Tự sắp xếp</div>
+                  <div data-mode="default">Sắp xếp mặc định</div>
+                  <div data-mode="random">Sắp xếp ngẫu nhiên</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-        <button id="closeMusicBtn">✖️</button>
-      </div>
-    </div>
-    <div class="player-body">
-      <div class="section">
-        <div class="section-header">
-          <h4>Thư viện nhạc</h4>
-          <button id="refreshLibraryBtn" title="Làm mới thư viện nhạc" class="icon-btn">🔄</button>
+        <div class="pane-content">
+          <div class="section">
+            <div class="section-header">
+              <h4>Thư viện nhạc</h4>
+              <button id="refreshLibraryBtn" title="Làm mới thư viện nhạc" class="icon-btn">🔄</button>
+            </div>
+            <div id="library-list" class="music-list"></div>
+          </div>
+          <div class="section divider"></div>
+          <div class="section">
+            <h4>Danh sách phát</h4>
+            <div id="playlist-list" class="music-list"></div>
+          </div>
         </div>
-        <div id="library-list" class="music-list"></div>
       </div>
-      <div class="section divider"></div>
-      <div class="section">
-        <h4>Danh sách phát</h4>
-        <div id="playlist-list" class="music-list"></div>
+
+      <!-- Tab Sự kiện -->
+      <div id="tab-events" class="tab-pane">
+        <div class="pane-header">
+          <h4>Quản lý sự kiện</h4>
+        </div>
+        <div class="pane-content">
+          <div id="event-list" class="event-list-container">
+            <!-- Danh sách sự kiện sẽ được render bằng JavaScript -->
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   <script src="features/music_player.js"></script>
   <script src="features/weather_effects.js"></script>
+  <script src="features/event_manager_ui.js"></script>
   <script src="renderer.js"></script>
   <script src="event/birthday_event.js"></script>
 </body>
