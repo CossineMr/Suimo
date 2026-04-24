@@ -9,8 +9,10 @@ const AudioManager = {
     audioContext: null,
 
     init() {
-        this.music.onended = () => this.playNext();
+        this.music.onended = () => this.handleSongEnded();
         this.fadeIntervals = {};
+        this.isLooping = false;
+        this.currentRepeatCount = 0; // Số lần đã lặp bài hiện tại
         
         // Initialize AudioContext on first interaction or init
         try {
@@ -96,11 +98,29 @@ const AudioManager = {
     playMusic(index) {
         if (index < 0 || index >= this.playlist.length) return;
         this.currentIndex = index;
-        this.music.src = `assets/audio/music/${this.playlist[index]}`;
+        const songData = this.playlist[index];
+        const fileName = typeof songData === 'string' ? songData : songData.file;
+        
+        this.music.src = `assets/audio/music/${fileName}`;
         this.music.play().then(() => {
             this.isPlayingMusic = true;
             this.updateUI();
         }).catch(e => console.error('[Music] Loi phat nhac:', e));
+    },
+
+    handleSongEnded() {
+        const songData = this.playlist[this.currentIndex];
+        const maxRepeat = (songData && songData.repeatCount) ? songData.repeatCount : 0;
+
+        if (this.currentRepeatCount < maxRepeat) {
+            this.currentRepeatCount++;
+            console.log(`[AudioManager] Lặp lại bài hát (${this.currentRepeatCount}/${maxRepeat})`);
+            this.music.currentTime = 0;
+            this.music.play();
+        } else {
+            this.currentRepeatCount = 0;
+            this.playNext();
+        }
     },
 
     togglePlay() {
@@ -120,7 +140,14 @@ const AudioManager = {
 
     playNext() {
         let next = this.currentIndex + 1;
-        if (next >= this.playlist.length) next = 0;
+        if (next >= this.playlist.length) {
+            if (this.isLooping) next = 0;
+            else {
+                this.isPlayingMusic = false;
+                this.updateUI();
+                return;
+            }
+        }
         this.playMusic(next);
     },
 
@@ -240,15 +267,39 @@ const SuiManager = {
     },
 
     executeSort() {
-        const mode = this.currentSortMode || 'manual';
+        const mode = this.currentSortMode || 'default';
+        
+        // Lưu bài hát đang phát (nếu có)
+        const currentSongFile = (AudioManager.currentIndex >= 0 && AudioManager.playlist[AudioManager.currentIndex]) 
+            ? AudioManager.playlist[AudioManager.currentIndex].file 
+            : null;
+
+        let newList = [];
         if (mode === 'default') {
-            AudioManager.playlist = [...this.originalLibrary];
-            this.renderPlaylist();
+            // Lấy toàn bộ TVN và sắp xếp A-Z
+            newList = this.originalLibrary.map(f => ({ file: f, repeatCount: 0 }));
+            newList.sort((a, b) => a.file.localeCompare(b.file, undefined, {sensitivity: 'base', numeric: true}));
         } else if (mode === 'random') {
-            AudioManager.playlist.sort(() => Math.random() - 0.5);
+            // Lấy toàn bộ TVN và xáo trộn
+            newList = this.originalLibrary.map(f => ({ file: f, repeatCount: 0 }));
+            for (let i = newList.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newList[i], newList[j]] = [newList[j], newList[i]];
+            }
+        }
+
+        if (newList.length > 0) {
+            AudioManager.playlist = newList;
+            
+            // Tìm lại vị trí bài đang phát trong danh sách mới
+            if (currentSongFile) {
+                AudioManager.currentIndex = AudioManager.playlist.findIndex(s => s.file === currentSongFile);
+            }
+            
             this.renderPlaylist();
-        } else if (mode === 'manual') {
-            this.renderPlaylist();
+            if (typeof spawnEmote === 'function') spawnEmote('🔀');
+        } else {
+            console.warn('[SuiManager] Thư viện trống, không có gì để sắp xếp.');
         }
     },
 
@@ -286,7 +337,7 @@ const SuiManager = {
     },
 
     addToPlaylist(file) {
-        AudioManager.playlist.push(file);
+        AudioManager.playlist.push({ file: file, repeatCount: 0 });
         this.renderPlaylist();
     },
 
@@ -294,17 +345,48 @@ const SuiManager = {
         const list = document.getElementById('playlist-list');
         if (!list) return;
         list.innerHTML = '';
-        AudioManager.playlist.forEach((file, idx) => {
+        AudioManager.playlist.forEach((songData, idx) => {
+            const file = songData.file;
             const item = document.createElement('div');
             item.className = 'music-item';
-            item.textContent = `${idx + 1}. ${file}`;
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'music-name';
+            nameSpan.textContent = `${idx + 1}. ${file}`;
+            nameSpan.onclick = () => AudioManager.playMusic(idx);
+            
+            const controls = document.createElement('div');
+            controls.className = 'music-item-controls';
+            controls.innerHTML = `
+                <span class="repeat-label">Lặp:</span>
+                <input type="number" min="0" max="99" value="${songData.repeatCount}" class="repeat-count-input" title="Số lần lặp lại bài này">
+            `;
+            
+            const repeatInput = controls.querySelector('input');
+            repeatInput.onclick = (e) => e.stopPropagation();
+            repeatInput.onchange = (e) => {
+                let val = parseInt(e.target.value);
+                if (isNaN(val) || val < 0) val = 0;
+                AudioManager.playlist[idx].repeatCount = val;
+                e.target.value = val;
+            };
+
+            item.appendChild(nameSpan);
+            item.appendChild(controls);
+
             item.dataset.file = file;
             item.draggable = true;
             item.addEventListener('dragstart', (e) => {
+                item.classList.add('dragging-internal');
                 e.dataTransfer.setData('source', 'playlist');
                 e.dataTransfer.setData('idx', idx.toString());
             });
-            item.addEventListener('click', () => AudioManager.playMusic(idx));
+            item.addEventListener('dragend', () => {
+                item.classList.remove('dragging-internal');
+                const items = playlistList.querySelectorAll('.music-item');
+                items.forEach(i => i.classList.remove('drag-over-insert', 'drag-over-swap', 'drag-over-bottom'));
+            });
+            
             list.appendChild(item);
         });
         AudioManager.updateUI();
@@ -350,7 +432,7 @@ const SuiManager = {
         const sortDropdownMenu = document.getElementById('sortDropdownMenu');
         const modeItems = sortDropdownMenu.querySelectorAll('div');
 
-        this.currentSortMode = 'manual';
+        this.currentSortMode = 'default';
 
         sortDropdownBtn.onclick = (e) => {
             e.stopPropagation();
@@ -366,9 +448,11 @@ const SuiManager = {
         modeItems.forEach(item => {
             item.onclick = (e) => {
                 e.stopPropagation();
+                const oldMode = this.currentSortMode;
                 this.currentSortMode = item.dataset.mode;
                 sortActionBtn.textContent = item.textContent;
 
+                // Cập nhật giao diện menu
                 modeItems.forEach(i => i.classList.remove('active'));
                 item.classList.add('active');
 
@@ -384,20 +468,34 @@ const SuiManager = {
         const playlistList = document.getElementById('playlist-list');
         playlistList.addEventListener('dragover', (e) => {
             e.preventDefault();
-            const afterElement = this.getDragAfterElement(playlistList, e.clientY);
             const items = playlistList.querySelectorAll('.music-item');
-            items.forEach(item => item.classList.remove('drag-over-top', 'drag-over-bottom'));
+            items.forEach(item => item.classList.remove('drag-over-insert', 'drag-over-swap', 'drag-over-bottom'));
 
-            if (afterElement) {
-                afterElement.classList.add('drag-over-top');
-            } else if (items.length > 0) {
-                items[items.length - 1].classList.add('drag-over-bottom');
+            // Xác định xem đang kéo từ đâu (Library hay Playlist nội bộ)
+            // Lưu ý: dataTransfer.getData không hoạt động trong dragover, nên ta dùng một biến tạm hoặc kiểm tra kiểu
+            const isInternal = document.querySelector('.music-item.dragging-internal');
+            
+            const afterElement = this.getDragAfterElement(playlistList, e.clientY);
+            const targetEl = e.target.closest('.music-item');
+
+            if (isInternal) {
+                // Chế độ HOÁN ĐỔI (Swap)
+                if (targetEl && !targetEl.classList.contains('dragging-internal')) {
+                    targetEl.classList.add('drag-over-swap');
+                }
+            } else {
+                // Chế độ CHÈN (Insert)
+                if (afterElement) {
+                    afterElement.classList.add('drag-over-insert');
+                } else if (items.length > 0) {
+                    items[items.length - 1].classList.add('drag-over-bottom');
+                }
             }
         });
 
         playlistList.addEventListener('dragleave', (e) => {
             const items = playlistList.querySelectorAll('.music-item');
-            items.forEach(item => item.classList.remove('drag-over-top', 'drag-over-bottom'));
+            items.forEach(item => item.classList.remove('drag-over-insert', 'drag-over-swap', 'drag-over-bottom'));
         });
 
         playlistList.addEventListener('drop', (e) => {
@@ -416,23 +514,40 @@ const SuiManager = {
                 const file = e.dataTransfer.getData('text/plain');
                 if (!file) return;
 
+                const songData = { file: file, repeatCount: 0 };
+
                 if (afterElement) {
-                    const insertIdx = AudioManager.playlist.indexOf(afterElement.dataset.file);
-                    AudioManager.playlist.splice(insertIdx, 0, file);
+                    const insertIdx = AudioManager.playlist.findIndex(s => s.file === afterElement.dataset.file);
+                    AudioManager.playlist.splice(insertIdx, 0, songData);
                 } else {
-                    AudioManager.playlist.push(file);
+                    AudioManager.playlist.push(songData);
                 }
             } else if (source === 'playlist') {
                 const dragIdx = parseInt(e.dataTransfer.getData('idx'), 10);
                 if (isNaN(dragIdx)) return;
 
-                const file = AudioManager.playlist[dragIdx];
-                AudioManager.playlist.splice(dragIdx, 1);
-
-                if (afterElement) {
-                    const insertIdx = AudioManager.playlist.indexOf(afterElement.dataset.file);
+                const targetEl = e.target.closest('.music-item');
+                if (targetEl) {
+                    const targetIdx = AudioManager.playlist.findIndex(s => s.file === targetEl.dataset.file);
+                    
+                    if (targetIdx !== -1 && targetIdx !== dragIdx) {
+                        // Hoán đổi vị trí (Swap) theo yêu cầu
+                        console.log(`[SuiManager] Hoán đổi bài hát: ${AudioManager.playlist[dragIdx].file} <-> ${AudioManager.playlist[targetIdx].file}`);
+                        
+                        const temp = AudioManager.playlist[dragIdx];
+                        AudioManager.playlist[dragIdx] = AudioManager.playlist[targetIdx];
+                        AudioManager.playlist[targetIdx] = temp;
+                    }
+                } else if (afterElement) {
+                    // Nếu không thả trực tiếp lên tệp nào, vẫn cho phép chèn (để tránh lỗi khi thả vào khoảng trống)
+                    const file = AudioManager.playlist[dragIdx];
+                    AudioManager.playlist.splice(dragIdx, 1);
+                    const insertIdx = AudioManager.playlist.findIndex(s => s.file === afterElement.dataset.file);
                     AudioManager.playlist.splice(insertIdx, 0, file);
                 } else {
+                    // Thả xuống cuối cùng
+                    const file = AudioManager.playlist[dragIdx];
+                    AudioManager.playlist.splice(dragIdx, 1);
                     AudioManager.playlist.push(file);
                 }
             }
@@ -442,6 +557,31 @@ const SuiManager = {
             }
 
             this.renderPlaylist();
+        });
+
+        // Kéo thả bài hát từ DSP về Thư viện (để xóa khỏi DSP)
+        const libraryList = document.getElementById('library-list');
+        libraryList.addEventListener('dragover', (e) => e.preventDefault());
+        libraryList.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const source = e.dataTransfer.getData('source');
+            if (source === 'playlist') {
+                const dragIdx = parseInt(e.dataTransfer.getData('idx'), 10);
+                if (!isNaN(dragIdx)) {
+                    const currentPlayingSong = (AudioManager.currentIndex >= 0) ? AudioManager.playlist[AudioManager.currentIndex] : null;
+                    
+                    console.log(`[SuiManager] Xóa bài hát khỏi DSP: ${AudioManager.playlist[dragIdx]}`);
+                    AudioManager.playlist.splice(dragIdx, 1);
+                    
+                    // Cập nhật lại chỉ mục bài đang phát
+                    if (currentPlayingSong) {
+                        AudioManager.currentIndex = AudioManager.playlist.indexOf(currentPlayingSong);
+                    }
+                    
+                    this.renderPlaylist();
+                    if (typeof spawnEmote === 'function') spawnEmote('🗑️');
+                }
+            }
         });
 
         // Di chuyển cửa sổ
@@ -461,10 +601,13 @@ const SuiManager = {
             this.el.style.transform = 'none';
         });
 
-        window.addEventListener('mouseup', () => {
-            this.isDraggingWindow = false;
-            header.style.cursor = 'move';
-        });
+        // Nút Loop
+        const loopBtn = document.getElementById('loopBtn');
+        loopBtn.onclick = () => {
+            AudioManager.isLooping = !AudioManager.isLooping;
+            loopBtn.classList.toggle('active', AudioManager.isLooping);
+            if (typeof spawnEmote === 'function') spawnEmote(AudioManager.isLooping ? '🔁' : '➡️');
+        };
     }
 };
 document.addEventListener('DOMContentLoaded', () => SuiManager.init());

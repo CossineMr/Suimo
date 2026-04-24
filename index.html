@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="UTF-8">
   <title>Slime Pet</title>
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
   <!-- Hiệu ứng bão (Mưa, Sét, Mây xám) -->
   <div id="storm-container">
@@ -57,6 +59,12 @@
 
   <!-- Bé Sui -->
   <img id="slime" class="interactive" src="assets/Slime_Sui.svg" alt="Slime">
+  
+  <!-- Bong bóng lời thoại trên Desktop -->
+  <div id="sui-desktop-bubble" class="chat-bubble-desktop">
+    <div class="bubble-content"></div>
+    <div class="bubble-tail"></div>
+  </div>
 
   <!-- Cửa sổ quản lý (Nhạc & Sự kiện) -->
   <div id="sui-manager" class="interactive">
@@ -64,25 +72,26 @@
       <div class="tab-container">
         <div class="tab active" data-tab="music">Âm nhạc 🎵</div>
         <div class="tab" data-tab="events">Sự kiện 📅</div>
+        <div class="tab" data-tab="tasks">Nhiệm vụ 🚀</div>
       </div>
       <div class="header-controls">
         <button id="closeManagerBtn" title="Đóng">✖️</button>
       </div>
     </div>
-    
+
     <div class="window-body">
       <!-- Tab Âm nhạc -->
       <div id="tab-music" class="tab-pane active">
         <div class="pane-header">
           <div class="music-controls-top">
             <button id="playBtn" title="Phát/Tạm dừng">▶️</button>
+            <button id="loopBtn" title="Lặp lại danh sách" class="loop-btn">🔁</button>
             <div id="sortContainer" class="sort-pill">
-              <button id="sortActionBtn" title="Thực hiện sắp xếp danh sách phát">Tự sắp xếp</button>
+              <button id="sortActionBtn" title="Thực hiện sắp xếp danh sách phát">Sắp xếp mặc định</button>
               <div class="sort-dropdown">
                 <button id="sortDropdownBtn" title="Chọn chế độ">▼</button>
                 <div id="sortDropdownMenu" class="sort-dropdown-content">
-                  <div data-mode="manual" class="active">Tự sắp xếp</div>
-                  <div data-mode="default">Sắp xếp mặc định</div>
+                  <div data-mode="default" class="active">Sắp xếp mặc định</div>
                   <div data-mode="random">Sắp xếp ngẫu nhiên</div>
                 </div>
               </div>
@@ -116,13 +125,83 @@
           </div>
         </div>
       </div>
+
+      <!-- Tab Nhiệm vụ -->
+      <div id="tab-tasks" class="tab-pane">
+        <div class="pane-header">
+          <h4>Hành trình nhiệm vụ</h4>
+          <div id="task-step-indicator" class="step-dots">
+            <span class="dot active"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+        </div>
+        <div class="pane-content">
+          <!-- Bước 1: Mô tả nhiệm vụ -->
+          <div id="step-describe" class="task-step active">
+            <div class="task-guide">Chào chủ nhân! Bạn muốn hoàn thành mục tiêu gì hôm nay? Hãy mô tả chi tiết để Sui hiểu nhé.</div>
+            <textarea id="task-description" placeholder="Ví dụ: Hoàn thành bài thuyết trình về dự án AI trong 3 tiếng..."></textarea>
+            <div class="task-actions">
+              <button id="btn-next-to-validate" class="primary-btn">Tiếp theo ➔</button>
+            </div>
+          </div>
+
+          <!-- Bước 2: Thẩm định (Sui Chat) -->
+          <div id="step-validate" class="task-step">
+            <div id="sui-validation-chat" class="chat-container">
+              <div class="message sui">Hmm, để Sui xem nhé... Bạn có thể cho Sui xem ảnh chụp tài liệu hoặc file liên quan không?</div>
+            </div>
+            <div class="validation-input-area">
+              <input type="file" id="task-file-input" hidden multiple>
+              <button id="btn-upload-trigger" class="icon-btn" title="Tải ảnh/file">📎</button>
+              <input type="text" id="task-chat-input" placeholder="Trả lời Sui...">
+              <button id="btn-send-chat" class="icon-btn">🚀</button>
+            </div>
+            <div class="task-actions">
+              <button id="btn-back-to-describe" class="secondary-btn">Quay lại</button>
+              <button id="btn-next-to-plan" class="primary-btn" disabled>Lập kế hoạch ➔</button>
+            </div>
+          </div>
+
+          <!-- Bước 3: Lập kế hoạch (Timeline) -->
+          <div id="step-plan" class="task-step">
+            <div class="plan-summary">Dựa trên độ khó, Sui đề xuất lộ trình sau:</div>
+            <div id="task-timeline" class="timeline-container">
+              <!-- Timeline sẽ được render tại đây -->
+            </div>
+            <div class="task-actions">
+              <button id="btn-back-to-validate" class="secondary-btn">Quay lại</button>
+              <button id="btn-confirm-plan" class="primary-btn">Bắt đầu ngay! 🔥</button>
+            </div>
+          </div>
+
+          <!-- Bước 4: Thực hiện -->
+          <div id="step-execute" class="task-step">
+            <div class="active-task-card">
+              <div class="task-timer" id="main-timer">00:00:00</div>
+              <h5 id="current-task-name">Đang làm việc...</h5>
+              <div class="progress-bar-container">
+                <div id="task-progress" class="progress-bar"></div>
+              </div>
+              <div id="next-break-info">Giải lao sau: 25:00</div>
+            </div>
+            <div class="task-actions">
+              <button id="btn-cancel-task" class="danger-btn">Dừng nhiệm vụ</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
   <script src="features/music_player.js"></script>
   <script src="features/weather_effects.js"></script>
   <script src="features/event_manager_ui.js"></script>
+  <script src="features/ai_service.js"></script>
+  <script src="features/task_planner.js"></script>
   <script src="renderer.js"></script>
   <script src="event/birthday_event.js"></script>
 </body>
+
 </html>
