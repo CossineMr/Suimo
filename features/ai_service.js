@@ -53,11 +53,32 @@ const AIService = {
     simulatePlanning(description) {
         return new Promise((resolve) => {
             setTimeout(() => {
-                // Phân tích độ dài mô tả để tạo timeline giả lập
-                const isComplex = description.length > 50;
-                
+                const descLower = description.toLowerCase();
                 let plan = [];
-                if (isComplex) {
+                
+                // 1. Kiểm tra nếu là nhiệm vụ xem Video/Youtube
+                if (descLower.includes('youtube') || descLower.includes('video')) {
+                    // Thử tìm con số phút trong text (ví dụ: "video 15 phút")
+                    const timeMatch = description.match(/(\d+)\s*(phút|p|min|m)/i);
+                    let duration = timeMatch ? parseInt(timeMatch[1]) : 20; // Mặc định 20p
+                    
+                    if (duration <= 25) {
+                        plan = [
+                            { type: 'work', label: `Xem video (${duration}p) & Ghi chú`, duration: duration, eventName: null },
+                            { type: 'work', label: 'Tổng kết nội dung', duration: 5, eventName: null }
+                        ];
+                    } else {
+                        const part1 = Math.ceil(duration / 2);
+                        plan = [
+                            { type: 'work', label: 'Xem video - Phần 1', duration: part1, eventName: null },
+                            { type: 'break', label: 'Nghỉ xả hơi', duration: 5, eventName: 'none' },
+                            { type: 'work', label: 'Xem video - Phần còn lại', duration: duration - part1, eventName: null },
+                            { type: 'work', label: 'Tổng kết & Review', duration: 10, eventName: null }
+                        ];
+                    }
+                } 
+                // 2. Kiểm tra nếu là nhiệm vụ phức tạp (dựa trên độ dài mô tả)
+                else if (description.length > 50) {
                     plan = [
                         { type: 'work', label: 'Tập trung cao độ - Phần 1', duration: 45, eventName: null },
                         { type: 'break', label: 'Giải lao & Thư giãn mắt', duration: 10, eventName: 'none' },
@@ -65,11 +86,13 @@ const AIService = {
                         { type: 'break', label: 'Giải lao giữa giờ', duration: 15, eventName: 'none' },
                         { type: 'work', label: 'Hoàn thiện & Tổng kết', duration: 30, eventName: null }
                     ];
-                } else {
+                } 
+                // 3. Nhiệm vụ đơn giản
+                else {
                     plan = [
-                        { type: 'work', label: 'Xử lý công việc', duration: 30, eventName: null },
+                        { type: 'work', label: 'Xử lý công việc', duration: 25, eventName: null },
                         { type: 'break', label: 'Nghỉ ngơi ngắn', duration: 5, eventName: 'none' },
-                        { type: 'work', label: 'Hoàn thành', duration: 25, eventName: null }
+                        { type: 'work', label: 'Hoàn thành', duration: 20, eventName: null }
                     ];
                 }
                 

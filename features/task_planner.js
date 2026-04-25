@@ -38,6 +38,32 @@ const TaskPlanner = {
         document.getElementById('task-chat-input').onkeydown = (e) => {
             if (e.key === 'Enter') this.handleChat();
         };
+
+        // Kéo thả tệp vào vùng nhiệm vụ
+        const taskPane = document.getElementById('tab-tasks');
+        taskPane.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            taskPane.classList.add('drag-over');
+        });
+        taskPane.addEventListener('dragleave', () => {
+            taskPane.classList.remove('drag-over');
+        });
+        taskPane.addEventListener('drop', (e) => {
+            e.preventDefault();
+            taskPane.classList.remove('drag-over');
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length > 0) {
+                this.addFiles(files);
+            }
+        });
+        // Nút xóa tệp
+        const clearBtn = document.getElementById('clearTaskFilesBtn');
+        if (clearBtn) {
+            clearBtn.onclick = () => {
+                this.taskData.files = [];
+                this.renderFileList();
+            };
+        }
     },
 
     goToStep(idx) {
@@ -113,12 +139,50 @@ const TaskPlanner = {
 
     handleFileUpload(e) {
         const files = Array.from(e.target.files);
-        if (files.length === 0) return;
+        this.addFiles(files);
+    },
+
+    addFiles(files) {
+        if (!files || files.length === 0) return;
         
         this.taskData.files = this.taskData.files.concat(files);
-        this.addChatMessage('user', `[Đã tải lên tệp: ${files.map(f => f.name).join(', ')}]`);
+        const fileNames = files.map(f => f.name).join(', ');
         
-        this.processAIValidation();
+        if (this.currentStep === 1) {
+            // Nếu đang ở bước thẩm định, gửi thông báo vào chat
+            this.addChatMessage('user', `[Đã gửi tệp: ${fileNames}]`);
+            this.processAIValidation();
+        } else {
+            // Ở các bước khác, chỉ hiện emote thông báo
+            if (typeof spawnEmote === 'function') spawnEmote('📎');
+            // Nếu đang ở bước 1, có thể hiển thị một dòng text nhỏ dưới textarea (tùy chọn)
+            console.log(`[TaskPlanner] Đã nhận tệp: ${fileNames}`);
+        }
+        this.renderFileList();
+    },
+
+    renderFileList() {
+        const container = document.getElementById('task-files-container');
+        const list = document.getElementById('task-files-list');
+        if (!container || !list) return;
+
+        if (this.taskData.files.length === 0) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'block';
+        list.innerHTML = '';
+        this.taskData.files.forEach((file, idx) => {
+            const item = document.createElement('div');
+            item.className = 'music-item';
+            item.style.cursor = 'default';
+            item.innerHTML = `
+                <span>${idx + 1}. ${file.name}</span>
+                <span style="font-size: 10px; opacity: 0.5; margin-left: 10px;">(${(file.size / 1024).toFixed(1)} KB)</span>
+            `;
+            list.appendChild(item);
+        });
     },
 
     addChatMessage(sender, text) {

@@ -66,6 +66,9 @@
     <div class="bubble-tail"></div>
   </div>
 
+  <!-- Lớp phủ nền khi bật Manager -->
+  <div id="manager-backdrop"></div>
+
   <!-- Cửa sổ quản lý (Nhạc & Sự kiện) -->
   <div id="sui-manager" class="interactive">
     <div class="window-header">
@@ -142,6 +145,16 @@
           <div id="step-describe" class="task-step active">
             <div class="task-guide">Chào chủ nhân! Bạn muốn hoàn thành mục tiêu gì hôm nay? Hãy mô tả chi tiết để Sui hiểu nhé.</div>
             <textarea id="task-description" placeholder="Ví dụ: Hoàn thành bài thuyết trình về dự án AI trong 3 tiếng..."></textarea>
+            
+            <!-- Hiển thị tệp đã đính kèm -->
+            <div id="task-files-container" class="task-files-section" style="display: none;">
+              <div class="section-header">
+                <h5>Tệp đã đính kèm 📎</h5>
+                <button id="clearTaskFilesBtn" class="secondary-btn" style="font-size: 10px; padding: 2px 8px;">Xóa</button>
+              </div>
+              <div id="task-files-list" class="music-list" style="max-height: 100px; margin-top: 5px;"></div>
+            </div>
+
             <div class="task-actions">
               <button id="btn-next-to-validate" class="primary-btn">Tiếp theo ➔</button>
             </div>
@@ -196,6 +209,7 @@
   </div>
 
   <script src="features/music_player.js"></script>
+  <script src="features/sui_manager.js"></script>
   <script src="features/weather_effects.js"></script>
   <script src="features/event_manager_ui.js"></script>
   <script src="features/ai_service.js"></script>

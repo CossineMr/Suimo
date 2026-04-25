@@ -2,24 +2,88 @@
  * EventManagerUI - Quản lý giao diện cho tab Sự kiện
  */
 const EventManagerUI = {
+    droppedFiles: [],
+
+    init() {
+        this.setupEventListeners();
+        this.render();
+    },
+
+    setupEventListeners() {
+        const pane = document.getElementById('tab-events');
+        if (!pane) return;
+
+        pane.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            pane.classList.add('drag-over');
+        });
+
+        pane.addEventListener('dragleave', () => {
+            pane.classList.remove('drag-over');
+        });
+
+        pane.addEventListener('drop', (e) => {
+            e.preventDefault();
+            pane.classList.remove('drag-over');
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length > 0) {
+                this.handleDrop(files);
+            }
+        });
+
+        const clearBtn = document.getElementById('clearEventFilesBtn');
+        if (clearBtn) {
+            clearBtn.onclick = () => {
+                this.droppedFiles = [];
+                this.renderFiles();
+            };
+        }
+    },
+
+    handleDrop(files) {
+        this.droppedFiles = this.droppedFiles.concat(files);
+        if (typeof spawnEmote === 'function') spawnEmote('📎');
+        this.renderFiles();
+    },
+
     render() {
         const container = document.getElementById('event-list');
         if (!container) return;
 
         if (typeof EventManager === 'undefined' || !EventManager.events) {
             container.innerHTML = '<p style="text-align:center; padding:20px; color:rgba(255,255,255,0.5);">Không có hệ thống sự kiện.</p>';
-            return;
-        }
-
-        if (EventManager.events.length === 0) {
+        } else if (EventManager.events.length === 0) {
             container.innerHTML = '<p style="text-align:center; padding:20px; color:rgba(255,255,255,0.5);">Chưa có sự kiện nào được đăng ký.</p>';
+        } else {
+            container.innerHTML = '';
+            EventManager.events.forEach(event => {
+                const card = this.createEventCard(event);
+                container.appendChild(card);
+            });
+        }
+
+        this.renderFiles();
+    },
+
+    renderFiles() {
+        const list = document.getElementById('event-files-list');
+        if (!list) return;
+
+        if (this.droppedFiles.length === 0) {
+            list.innerHTML = '<p style="text-align:center; padding:15px; color:rgba(255,255,255,0.3); font-size: 12px;">Kéo thả tệp vào đây để đính kèm...</p>';
             return;
         }
 
-        container.innerHTML = '';
-        EventManager.events.forEach(event => {
-            const card = this.createEventCard(event);
-            container.appendChild(card);
+        list.innerHTML = '';
+        this.droppedFiles.forEach((file, idx) => {
+            const item = document.createElement('div');
+            item.className = 'music-item'; // Dùng chung style cho đẹp
+            item.style.cursor = 'default';
+            item.innerHTML = `
+                <span>${idx + 1}. ${file.name}</span>
+                <span style="font-size: 10px; opacity: 0.5; margin-left: 10px;">(${(file.size / 1024).toFixed(1)} KB)</span>
+            `;
+            list.appendChild(item);
         });
     },
 

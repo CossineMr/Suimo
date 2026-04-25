@@ -841,6 +841,27 @@ button:hover {
     cursor: pointer;
 }
 
+#manager-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 10008;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: auto; /* Chặn click xuyên qua desktop */
+}
+
+#manager-backdrop.show {
+    display: block;
+    opacity: 1;
+}
+
 /* ===== SUI MANAGER WINDOW (MULTI-TAB) ===== */
 #sui-manager {
     position: absolute;
@@ -1430,6 +1451,12 @@ button:hover {
     align-items: center;
 }
 
+#tab-tasks.drag-over {
+    background: rgba(99, 179, 255, 0.15) !important;
+    outline: 2px dashed #63b3ff;
+    outline-offset: -10px;
+}
+
 .step-dots {
     display: flex;
     gap: 6px;
@@ -1542,6 +1569,29 @@ button:hover {
     background: rgba(0, 0, 0, 0.2);
     border-radius: 12px;
     margin-bottom: 10px;
+}
+
+.event-files-section, .task-files-section {
+    margin-top: 20px;
+    padding: 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.event-files-section .section-header, .task-files-section .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.event-status {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    font-weight: bold;
 }
 
 .message {

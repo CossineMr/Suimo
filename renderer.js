@@ -165,56 +165,64 @@ function isOverSlimeBody(offsetX, offsetY) {
     return alpha > 30; // Ngưỡng alpha để tính là chạm
 }
 
-const interactives = document.querySelectorAll('.interactive');
-let isSlimeHovered = false;
+// ==== HỆ THỐNG KIỂM TRA ĐIỂM CHẠM TẬP TRUNG (MOUSE INTERACTION) ====
+function checkMouseInteraction(mx, my) {
+    if (isDrawingMode || slime.isDragging) {
+        ipcRenderer.send('set-ignore-mouse-events', false);
+        return;
+    }
 
-function applyHoverLogic(el) {
-    if (el === slimeEl) {
-        // Pixel-perfect check cho bé Sui
-        el.addEventListener('mousemove', (e) => {
-            if (isDrawingMode || slime.isDragging) return;
+    let shouldBlock = false;
 
-            // Dự phòng nếu hit data chưa kịp chuẩn bị
-            if (!slimePixelData && slimeEl.naturalWidth) {
-                prepareSlimeHitData();
-            }
-
-            if (isOverSlimeBody(e.offsetX, e.offsetY)) {
-                if (!isSlimeHovered) {
-                    isSlimeHovered = true;
-                    ipcRenderer.send('set-ignore-mouse-events', false);
-                    slimeEl.classList.add('sui-glow');
-                }
-            } else {
-                if (isSlimeHovered) {
-                    isSlimeHovered = false;
-                    ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
-                    slimeEl.classList.remove('sui-glow');
-                }
-            }
-        });
-
-        el.addEventListener('mouseleave', () => {
-            if (isSlimeHovered) {
-                isSlimeHovered = false;
-                if (!isDrawingMode && !slime.isDragging) {
-                    ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
-                }
-                slimeEl.classList.remove('sui-glow');
-            }
-        });
+    // 1. Kiểm tra bé Sui (Pixel-perfect)
+    const slimeRect = slimeEl.getBoundingClientRect();
+    if (mx >= slimeRect.left && mx <= slimeRect.right &&
+        my >= slimeRect.top && my <= slimeRect.bottom) {
+        if (isOverSlimeBody(mx - slimeRect.left, my - slimeRect.top)) {
+            shouldBlock = true;
+            slimeEl.classList.add('sui-glow');
+        } else {
+            slimeEl.classList.remove('sui-glow');
+        }
     } else {
-        // Các thành phần UI khác dùng bounding box bình thường
-        el.addEventListener('mouseenter', () => {
-            if (!isDrawingMode && !slime.isDragging) ipcRenderer.send('set-ignore-mouse-events', false);
-        });
-        el.addEventListener('mouseleave', () => {
-            if (!isDrawingMode && !slime.isDragging) ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
-        });
+        slimeEl.classList.remove('sui-glow');
+    }
+
+    // 2. Kiểm tra cửa sổ Manager (nếu đang mở)
+    if (!shouldBlock && typeof SuiManager !== 'undefined' && SuiManager.isOpen) {
+        const rect = SuiManager.el.getBoundingClientRect();
+        if (mx >= rect.left && mx <= rect.right && 
+            my >= rect.top && my <= rect.bottom) {
+            shouldBlock = true;
+        }
+    }
+
+    // 3. Kiểm tra các nút UI khác (như quitBtn, music-status, controls)
+    if (!shouldBlock) {
+        const interactives = document.querySelectorAll('.interactive:not(#slime):not(#sui-manager)');
+        for (let el of interactives) {
+            if (el.offsetWidth > 0 && el.offsetHeight > 0) {
+                const rect = el.getBoundingClientRect();
+                if (mx >= rect.left && mx <= rect.right && 
+                    my >= rect.top && my <= rect.bottom) {
+                    shouldBlock = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Gửi tín hiệu cho Electron
+    if (shouldBlock) {
+        ipcRenderer.send('set-ignore-mouse-events', false);
+    } else {
+        ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
     }
 }
-interactives.forEach(applyHoverLogic);
-applyHoverLogic(slimeEl);
+
+window.addEventListener('mousemove', (e) => {
+    checkMouseInteraction(e.clientX, e.clientY);
+});
 
 quitBtn.addEventListener('click', () => ipcRenderer.send('quit-app'));
 
@@ -227,7 +235,12 @@ let isSpaceHeld = false;
 // ==== HỆ THỐNG BÃO & HIỆU ỨNG THỜI TIẾT ĐÃ ĐƯỢC CHUYỂN SANG features/weather_effects.js ====
 
 window.addEventListener('keydown', (e) => {
-    if (isDrawingMode) return; // Khong bat khi dang ve
+    // Nếu đang tập trung vào ô nhập liệu thì không xử lý phím tắt hệ thống
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+        return;
+    }
+
+    if (isDrawingMode) return; 
     const key = e.key.toLowerCase();
     if (key === 'm') SuiManager.toggle();
 
@@ -796,15 +809,15 @@ slimeEl.addEventListener('pointerup', (e) => {
     slime.isDragging = false;
     slime.vy = 2;
     slimeEl.releasePointerCapture(e.pointerId);
-    if (!isDrawingMode) ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
+    checkMouseInteraction(e.clientX, e.clientY);
 });
 
 // Dự phòng: nếu pointer bị mất (alt-tab, v.v.)
-slimeEl.addEventListener('lostpointercapture', () => {
+slimeEl.addEventListener('lostpointercapture', (e) => {
     if (slime.isDragging) {
         slime.isDragging = false;
         slime.vy = 2;
-        if (!isDrawingMode) ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
+        checkMouseInteraction(e.clientX, e.clientY);
     }
 });
 
