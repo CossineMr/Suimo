@@ -427,7 +427,7 @@ window.addEventListener('load', async () => {
         // Tải SFX quan trọng trước
         await AudioManager.preloadSFX(['Squish', 'Lightning', 'Rain', 'CardboardBoxDrop']);
         // Tải nhạc nền sự kiện sau
-        AudioManager.preloadMusic('birthday_song', 'assets/audio/music/Happy Birthday To You.mp3');
+        AudioManager.preloadMusic('birthday_song', 'event/birthday_module/audio/Happy Birthday To You.mp3');
     }
 
     setTimeout(() => {

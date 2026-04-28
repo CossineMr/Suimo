@@ -1,0 +1,33 @@
+
+Dưới đây là cách quản lý sự kiện sinh nhật một cách đơn giản nhất sau khi tôi đã gộp nó thành module:
+
+### 1. Cách Tắt (Tạm dừng sự kiện)
+Bạn tìm đến cuối file `index.html` và thêm dấu `<!--  -->` để vô hiệu hóa dòng code này:
+
+*   **Trước khi tắt:**
+    ```html
+    <script src="event/birthday_module/birthday_event.js"></script>
+    ```
+*   **Sau khi tắt (Vô hiệu hóa):**
+    ```html
+    <!-- <script src="event/birthday_module/birthday_event.js"></script> -->
+    ```
+*(Khi làm vậy, sự kiện sẽ không còn chạy trong ứng dụng nữa, nhưng các tệp tin vẫn còn trong máy bạn).*
+
+---
+
+### 2. Cách Mở lại (Kích hoạt sự kiện)
+Bạn chỉ cần xóa dấu `<!--  -->` đi để dòng code sáng lên là xong:
+```html
+<script src="event/birthday_module/birthday_event.js"></script>
+```
+
+---
+
+### 3. Cách Xóa hẳn (Gỡ bỏ hoàn toàn khỏi máy)
+Nếu bạn không bao giờ muốn dùng sự kiện này nữa và muốn dọn dẹp bộ nhớ:
+1.  **Xóa dòng code** đó trong file `index.html`.
+2.  **Xóa thư mục** tên là `birthday_module` (nằm trong thư mục `event`).
+
+**Tại sao bây giờ lại dễ dàng như vậy?**
+Vì tôi đã gom tất cả "linh hồn" của sự kiện (bao gồm ảnh, nhạc, code, và giao diện) vào duy nhất một thư mục `birthday_module`. Bạn chỉ cần quản lý đúng một dòng script đó là có thể kiểm soát được tất cả.
